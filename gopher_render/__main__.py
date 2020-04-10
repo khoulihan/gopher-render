@@ -25,6 +25,7 @@ if __name__ == "__main__":
         },
         'output_format': 'html5',
     })
+    #md = markdown.Markdown()
     md_parsed = md.convert(source_text)
 
     print(md_parsed)
