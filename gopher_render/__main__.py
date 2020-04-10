@@ -30,7 +30,10 @@ if __name__ == "__main__":
 
     print(md_parsed)
 
-    parser = GopherHTMLParser()
+    parser = GopherHTMLParser(
+        output_format="gophermap",
+        gopher_host="my.gopher.com"
+    )
     parser.feed(md_parsed)
     parser.close()
 

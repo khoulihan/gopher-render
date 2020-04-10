@@ -247,6 +247,7 @@ class CodeFormatter(Formatter):
 
         return settings['template'].format(content)
 
+
 class PreFormatter(Formatter):
     def __init__(self, *args, **kwargs):
         self.defaults = dict(
@@ -279,6 +280,66 @@ class PreFormatter(Formatter):
         )
 
 
+class LinkFormatter(Formatter):
+
+    def __init__(self, *args, **kwargs):
+        self.defaults = dict(
+            template="{content}[{link_number}]",
+            capitalized=False,
+        )
+        self.defaults.update(kwargs)
+
+    def format(self, tag, content, **kwargs):
+        settings = self._get_format(tag, **kwargs)
+        capitalize_func = capitalize if settings['capitalized'] else _noop
+        return settings['template'].format(
+            content=capitalize_func(super().format(tag, content, **kwargs)),
+            link_number=kwargs["link_number"]
+        )
+
+
+class ExtractedLinkFormatter(Formatter):
+    def __init__(self, *args, **kwargs):
+        self.defaults = dict(
+            template="[{link_number}] {description}: {url}\n",
+            gophermap_template="{type}[{link_number}] {description}\t{selector}\t{host}\t{port}\n",
+            max_link_description=10,
+        )
+        self.defaults.update(kwargs)
+
+    def format(self, tag, content, **kwargs):
+        settings = self._get_format(tag, **kwargs)
+
+        href = kwargs['href']
+        title = kwargs['title']
+
+        max_link_description = settings['max_link_description']
+        trimming = len(content) > max_link_description
+        content = content.strip()[:max_link_description]
+        if trimming:
+            content = "{}...".format(content)
+
+        description = title if title is not None else content
+
+        output_format = kwargs['output_format']
+        if output_format == 'gophermap':
+            gopher_link = kwargs['gopher_link']
+            return settings['gophermap_template'].format(
+                description=super().format(tag, description, **kwargs),
+                link_number=kwargs["link_number"],
+                selector=gopher_link['selector'],
+                type=gopher_link['type'],
+                host=gopher_link['host'],
+                port=gopher_link['port'],
+            )
+        else:
+            return settings['template'].format(
+                description=super().format(tag, description, **kwargs),
+                link_number=kwargs["link_number"],
+                url=href
+            )
+
+
 null_formatter = Formatter()
 
 default_h1_formatter = HeaderFormatter(
@@ -308,3 +369,7 @@ default_p_formatter = ParagraphFormatter(
 default_code_formatter = CodeFormatter(template="`{}`")
 
 default_pre_formatter = PreFormatter()
+
+default_link_formatter = LinkFormatter()
+
+default_extracted_link_formatter = ExtractedLinkFormatter()
