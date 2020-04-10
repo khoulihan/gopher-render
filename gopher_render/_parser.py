@@ -7,6 +7,7 @@ from .formatting import null_formatter, default_h1_formatter, default_h2_formatt
 from .formatting import default_h3_formatter, default_p_formatter
 from .formatting import default_pre_formatter, default_code_formatter
 from .formatting import default_link_formatter, default_extracted_link_formatter
+from .formatting import default_em_formatter, default_strong_formatter
 
 
 class TagParser(object):
@@ -198,6 +199,8 @@ class GopherHTMLParser(HTMLParser):
             'pre': default_pre_formatter,
             'code': default_code_formatter,
             'a': (default_link_formatter, default_extracted_link_formatter),
+            'em': default_em_formatter,
+            'strong': default_strong_formatter,
         }
         self.formatters.update(formatters)
         self._next_link_number = 1

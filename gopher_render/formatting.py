@@ -340,6 +340,22 @@ class ExtractedLinkFormatter(Formatter):
             )
 
 
+class SpanFormatter(Formatter):
+    def __init__(self, *args, **kwargs):
+        self.defaults = dict(
+            template="{}",
+            capitalized=False,
+        )
+        self.defaults.update(kwargs)
+
+    def format(self, tag, content, **kwargs):
+        settings = self._get_format(tag, **kwargs)
+        capitalize_func = capitalize if settings['capitalized'] else _noop
+        return settings['template'].format(
+            capitalize_func(super().format(tag, content, **kwargs))
+        )
+
+
 null_formatter = Formatter()
 
 default_h1_formatter = HeaderFormatter(
@@ -373,3 +389,7 @@ default_pre_formatter = PreFormatter()
 default_link_formatter = LinkFormatter()
 
 default_extracted_link_formatter = ExtractedLinkFormatter()
+
+default_em_formatter = SpanFormatter(template="/{}/")
+
+default_strong_formatter = SpanFormatter(template="*{}*")
