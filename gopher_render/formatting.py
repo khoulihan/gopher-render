@@ -275,7 +275,7 @@ class PreFormatter(Formatter):
 
         return "{}{}{}".format(
             "\n"*settings['lines_above'],
-            content,
+            "\n".join(formatted),
             "\n"*settings['lines_below'],
         )
 
@@ -384,7 +384,7 @@ default_p_formatter = ParagraphFormatter(
 
 default_code_formatter = CodeFormatter(template="`{}`")
 
-default_pre_formatter = PreFormatter()
+default_pre_formatter = PreFormatter(indent=4)
 
 default_link_formatter = LinkFormatter()
 
