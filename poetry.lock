@@ -1,0 +1,35 @@
+[[package]]
+category = "main"
+description = "Python implementation of Markdown."
+name = "markdown"
+optional = true
+python-versions = ">=3.5"
+version = "3.2.1"
+
+[package.dependencies]
+setuptools = ">=36"
+
+[package.extras]
+testing = ["coverage", "pyyaml"]
+
+[[package]]
+category = "main"
+description = "Pygments is a syntax highlighting package written in Python."
+name = "pygments"
+optional = true
+python-versions = ">=3.5"
+version = "2.6.1"
+
+[metadata]
+content-hash = "079eaa47b7b030fb2de3247931cf478e1e8cff5f1151c01fd60867b50d3a9696"
+python-versions = "^3.7"
+
+[metadata.files]
+markdown = [
+    {file = "Markdown-3.2.1-py2.py3-none-any.whl", hash = "sha256:e4795399163109457d4c5af2183fbe6b60326c17cfdf25ce6e7474c6624f725d"},
+    {file = "Markdown-3.2.1.tar.gz", hash = "sha256:90fee683eeabe1a92e149f7ba74e5ccdc81cd397bd6c516d93a8da0ef90b6902"},
+]
+pygments = [
+    {file = "Pygments-2.6.1-py3-none-any.whl", hash = "sha256:ff7a40b4860b727ab48fad6360eb351cc1b33cbf9b15a0f689ca5353e9463324"},
+    {file = "Pygments-2.6.1.tar.gz", hash = "sha256:647344a061c249a3b74e230c739f434d7ea4d8b1d5f3721bc0f3558049b38f44"},
+]

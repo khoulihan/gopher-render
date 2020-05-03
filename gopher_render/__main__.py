@@ -11,7 +11,7 @@ def _parse_arguments():
     args = parser.parse_args()
     return args
 
-if __name__ == "__main__":
+def main():
     args = _parse_arguments()
     source_text = None
     with open(args.source, 'r') as in_file:
@@ -41,3 +41,7 @@ if __name__ == "__main__":
     #    out_file.write(parser.parsed)
 
     print(parser.parsed)
+
+
+if __name__ == "__main__":
+    main()
