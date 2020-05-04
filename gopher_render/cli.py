@@ -9,6 +9,7 @@ def _parse_arguments():
     parser = argparse.ArgumentParser(description="Convert Markdown or HTML to plain text or gophermaps")
     parser.add_argument("source", type=str, action="store", help="source file")
     parser.add_argument("destination", type=str, action="store", help="destination file")
+    parser.add_argument("-d", "--dump", action="store_true", dest="dump", help="Dump the html to the console before parsing it")
     args = parser.parse_args()
     return args
 
@@ -28,6 +29,9 @@ def main():
     })
     #md = markdown.Markdown()
     md_parsed = md.convert(source_text)
+
+    if args.dump:
+        print(md_parsed)
 
     parser = GopherHTMLParser(
         output_format="gophermap",
