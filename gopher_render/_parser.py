@@ -252,8 +252,6 @@ class GopherHTMLParser(HTMLParser):
         self._tag_stack.append(t)
         if parent:
             parent.children.append(t)
-        else:
-            print("Unsupported start tag, ignoring: " + tag)
 
     def handle_endtag(self, tag):
         top = self._get_top()

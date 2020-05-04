@@ -29,8 +29,6 @@ def main():
     #md = markdown.Markdown()
     md_parsed = md.convert(source_text)
 
-    print(md_parsed)
-
     parser = GopherHTMLParser(
         output_format="gophermap",
         gopher_host="my.gopher.com"

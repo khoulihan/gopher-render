@@ -34,8 +34,6 @@ def full_justify(text, width, *args, **kwargs):
             wide = ' ' * (n + 2)
             out_lines.append(indent + wide.join(words[:r]) + wide + narrow.join(words[r:]))
     out_lines.append(lines[-1])
-    for l in out_lines:
-        print(len(l))
     return '\n'.join(out_lines)
 
 
