@@ -379,7 +379,6 @@ default_h3_formatter = HeaderFormatter(
 )
 
 default_p_formatter = ParagraphFormatter(
-    indent=1,
 )
 
 default_code_formatter = CodeFormatter(template="`{}`")
