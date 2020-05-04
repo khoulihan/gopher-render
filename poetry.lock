@@ -20,8 +20,11 @@ optional = true
 python-versions = ">=3.5"
 version = "2.6.1"
 
+[extras]
+markdown = ["markdown", "pygments"]
+
 [metadata]
-content-hash = "079eaa47b7b030fb2de3247931cf478e1e8cff5f1151c01fd60867b50d3a9696"
+content-hash = "66de99b5c2c592bbc9a727b4859cbd902fcecc10f6ec74f9df38cf9bbe1d78df"
 python-versions = "^3.7"
 
 [metadata.files]
