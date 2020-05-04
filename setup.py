@@ -3,10 +3,10 @@ import setuptools
 with open("README.md", "r") as fh:
     long_description = fh.read()
 
-version = __import__('gopher_render').__version__
+version = "0.1.0"
 
 setuptools.setup(
-    name="goper-render",
+    name="gopher-render",
     version=version,
     author="Kevin Houlihan",
     author_email="kevin@hyperlinkyourheart.com",
@@ -26,4 +26,9 @@ setuptools.setup(
         'Topic :: Text Processing',
     ],
     python_requires='>=3.6',
+    entry_points={
+        'console_scripts': [
+            'gopher-render = gopher_render.__main__:main',
+        ]
+    },
 )
