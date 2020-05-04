@@ -12,7 +12,7 @@ jobs:
       - run:
           command: |
             pip install poetry
-            poetry install
+            poetry install -E markdown
       - python/save-cache
       - run:
           command: poetry run py.test
