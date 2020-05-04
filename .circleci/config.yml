@@ -15,7 +15,7 @@ jobs:
             poetry install
       - python/save-cache
       - run:
-          command: py.test
+          command: poetry run py.test
           name: Test
 
 workflows:
