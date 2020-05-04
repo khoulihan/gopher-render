@@ -285,7 +285,7 @@ class GopherHTMLParser(HTMLParser):
         # Compile the parsed string
         for t in self._tag_stack:
             self._parsed.append(t.render())
-        if self._link_placement == 'footer':
+        if self._link_placement == 'footer' and len(self._pending_links) > 0:
             self._parsed.append("\n")
             for l in self._pending_links:
                 self._parsed.append(l.link_render())

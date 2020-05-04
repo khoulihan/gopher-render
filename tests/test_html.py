@@ -21,7 +21,7 @@ def test_p_tag_default_short():
     assert output.endswith("\n")
 
     # No wrapping should occur (line count includes blanks)
-    lines = output.splitlines()
+    lines = output.split('\n')
     assert len(lines) == 3
 
     # Initial line indent
@@ -55,7 +55,7 @@ def test_p_tag_default_long():
     assert output.endswith("\n")
 
     # Wrapping (line count includes blank lines)
-    lines = output.splitlines()
+    lines = output.split('\n')
     assert len(lines) == 10
 
     # Initial line indent
@@ -85,7 +85,7 @@ def test_h1_tag_default():
     assert output.endswith("\n\n")
 
     # Blank lines, header, and underline
-    lines = output.splitlines()
+    lines = output.split('\n')
     assert len(lines) == 6
 
     # Check the centering
@@ -95,3 +95,72 @@ def test_h1_tag_default():
 
     # Check the underline
     assert lines[3] == "=" * 67
+
+
+def test_code_span_default():
+    """
+    Default code tag render should just surround the content in backticks.
+    """
+    html = "<code>ClassName</code>"
+    parser = GopherHTMLParser()
+    parser.feed(html)
+    parser.close()
+    output = parser.parsed
+
+    # Surrounded by backticks
+    assert output.startswith("`")
+    assert output.endswith("`")
+
+    # Only one set of backticks, and the content.
+    assert len(output) == 11
+
+    # Just one line
+    lines = output.split('\n')
+    assert len(lines) == 1
+
+
+def test_code_span_in_p_default():
+    """
+    Default code tag render should just surround the content in backticks.
+
+    This test checks that this works correctly within a p tag.
+    """
+    html = "<p>This paragrah includes a <code>ClassName</code> in a code tag.</p>"
+    parser = GopherHTMLParser()
+    parser.feed(html)
+    parser.close()
+    output = parser.parsed
+
+    # Surrounded by backticks
+    assert output == "\n        This paragrah includes a `ClassName` in a code tag.\n"
+
+
+def test_code_block_default():
+    """
+    Where a code tags parent is a pre tag, its content should NOT be surrounded by backticks.
+
+    The pre tag content will be indented, and also have a line before and after
+    """
+    code = "\n".join([
+        "def func():",
+        "    print('Some nonsense')",
+        "    return True",
+    ])
+    html = "<pre><code>{}</code></pre>".format(code)
+    parser = GopherHTMLParser()
+    parser.feed(html)
+    parser.close()
+    output = parser.parsed
+
+    # Blank lines before and after.
+    assert output.startswith("\n")
+    assert output.endswith("\n")
+
+    # No wrapping should occur (line count includes blanks)
+    lines = output.split('\n')
+    assert len(lines) == 5
+
+    codelines = code.split('\n')
+
+    for li in range(1, 4):
+        assert lines[li] == "    {}".format(codelines[li - 1])

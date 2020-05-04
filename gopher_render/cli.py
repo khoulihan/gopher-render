@@ -19,14 +19,23 @@ def main():
     with open(args.source, 'r') as in_file:
         source_text = in_file.read()
 
-    md = markdown.Markdown(extensions=['markdown.extensions.codehilite', 'markdown.extensions.extra', 'markdown.extensions.meta'], **{
+    # md = markdown.Markdown(extensions=['markdown.extensions.codehilite', 'markdown.extensions.extra', 'markdown.extensions.meta'], **{
+    #     'extension_configs': {
+    #         'markdown.extensions.codehilite': {'css_class': 'highlight'},
+    #         'markdown.extensions.extra': {},
+    #         'markdown.extensions.meta': {},
+    #     },
+    #     'output_format': 'html5',
+    # })
+
+    # This version is for checking that default code blocks work ok
+    md = markdown.Markdown(extensions=['markdown.extensions.meta'], **{
         'extension_configs': {
-            'markdown.extensions.codehilite': {'css_class': 'highlight'},
-            'markdown.extensions.extra': {},
             'markdown.extensions.meta': {},
         },
         'output_format': 'html5',
     })
+
     #md = markdown.Markdown()
     md_parsed = md.convert(source_text)
 

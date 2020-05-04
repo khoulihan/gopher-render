@@ -236,14 +236,21 @@ class ParagraphFormatter(Formatter):
 class CodeFormatter(Formatter):
     def __init__(self, *args, **kwargs):
         self.defaults = dict(
-            template="{}"
+            inline_template="{}",
+            block_template="{}"
         )
         self.defaults.update(kwargs)
 
     def format(self, tag, content, **kwargs):
         settings = self._get_format(tag, **kwargs)
 
-        return settings['template'].format(content)
+        parent = kwargs.get('parent', None)
+        if parent and parent.tag == 'pre':
+            # The pre will handle the formatting
+            return content
+        if '\n' in content:
+            return settings['block_template'].format(content)
+        return settings['inline_template'].format(content)
 
 
 class PreFormatter(Formatter):
@@ -376,10 +383,9 @@ default_h3_formatter = HeaderFormatter(
     underline_char='-',
 )
 
-default_p_formatter = ParagraphFormatter(
-)
+default_p_formatter = ParagraphFormatter()
 
-default_code_formatter = CodeFormatter(template="`{}`")
+default_code_formatter = CodeFormatter(inline_template="`{}`")
 
 default_pre_formatter = PreFormatter(indent=4)
 
