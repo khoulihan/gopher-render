@@ -4,6 +4,7 @@ import markdown
 from markdown.extensions import codehilite
 import pygments
 from . import GopherHTMLParser
+from .formatting import Box
 
 def _parse_arguments():
     parser = argparse.ArgumentParser(description="Convert Markdown or HTML to plain text or gophermaps")
@@ -44,7 +45,14 @@ def main():
 
     parser = GopherHTMLParser(
         output_format="gophermap",
-        gopher_host="my.gopher.com"
+        gopher_host="my.gopher.com",
+        box=Box(
+            width=67,
+            left=10,
+            right=10,
+            top=0,
+            bottom=0
+        )
     )
     parser.feed(md_parsed)
     parser.close()

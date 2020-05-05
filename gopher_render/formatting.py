@@ -79,6 +79,53 @@ def capitalize(text):
     return text.capitalize()
 
 
+class Box(object):
+    """
+    A rudimentary nesting box model where left and right margins are inherited.
+    """
+    def __init__(
+        self,
+        width=67,
+        left=0,
+        right=0,
+        top=0,
+        bottom=0,
+        parent=None
+    ):
+        self.width = width
+        self.left = left
+        self.total_left = left
+        self.right = right
+        self.total_right = right
+        self.top = top
+        self.bottom = bottom
+        self.parent = parent
+        # If a parent was provided, its width overrides the provided width
+        # and its margins are added to the provided margins to give total margins
+        if parent:
+            self.parent = parent
+            self.width = parent.width
+            self.total_left = self.left + parent.total_left
+            self.total_right = self.right + parent.total_right
+
+    def effective_width():
+        doc = "The width actually available to the element."
+        def fget(self):
+            return self.width - (self.total_left + self.total_right)
+        return locals()
+    effective_width = property(**effective_width())
+
+    def __repr__(self):
+        return "Box [ t: {}, b: {}, l: {}, r: {}, w: {}, ew: {} ]".format(
+            self.top,
+            self.bottom,
+            self.left,
+            self.right,
+            self.width,
+            self.effective_width
+        )
+
+
 class Formatter(object):
     """
     Base formatter.
@@ -112,11 +159,60 @@ class Formatter(object):
         )
         return self.format(tag, content, **kwargs)
 
+    def get_box(self, tag, context):
+        """
+        Get a box adjusted for the context.
+
+        Base implementation just wraps the parent box without modifying it.
+        Inheriting classes can override this to set margins for an element.
+        """
+        parent = context.get('parent_box', None)
+        if parent:
+            return Box(parent=parent)
+        return None
+
     def format(self, tag, content, **kwargs):
         return content
 
 
-class HeaderFormatter(Formatter):
+class BoxFormatter(Formatter):
+    def get_box(self, tag, context):
+        """
+        Get a box adjusted for the context.
+
+        This class adds a left and right margin if set for the formatter.
+        """
+        parent = context.get('parent_box', None)
+        if parent:
+            left = self.defaults.get('margin_left', 0)
+            right = self.defaults.get('margin_right', 0)
+            top = self.defaults.get('margin_top', 0)
+            bottom = self.defaults.get('margin_bottom', 0)
+            return Box(
+                top=top,
+                bottom=bottom,
+                left=left,
+                right=right,
+                parent=parent
+            )
+        return None
+
+    def format(self, tag, content, **kwargs):
+        box = self.get_box(tag, kwargs)
+        # Not sure if splitlines of split('\n') is best here
+        lines = content.splitlines(keepends=True)
+        indented = "".join([
+            "{}{}".format(' ' * box.left, l)
+            for l in lines
+        ])
+        return "{}{}{}".format(
+            '\n' * box.top,
+            indented,
+            '\n' * box.bottom,
+        )
+
+
+class HeaderFormatter(BoxFormatter):
     """
     template="{}",
     centered=True,
@@ -124,8 +220,8 @@ class HeaderFormatter(Formatter):
     underlined=False,
     underline_char="=",
     underline_full=False,
-    lines_above=1,
-    lines_below=2
+    margin_top=2,
+    margin_bottom=1
     """
 
     def __init__(self, *args, **kwargs):
@@ -136,8 +232,8 @@ class HeaderFormatter(Formatter):
             underlined=False,
             underline_char="=",
             underline_full=False,
-            lines_above=1,
-            lines_below=2
+            margin_top=1,
+            margin_bottom=2
         )
         self.defaults.update(kwargs)
 
@@ -145,22 +241,38 @@ class HeaderFormatter(Formatter):
         settings = self._get_format(tag, **kwargs)
         center_func = center if settings['centered'] else _noop
         capitalize_func = capitalize if settings['capitalized'] else _noop
-        width = kwargs.get('width', None)
+        box = self.get_box(tag, kwargs)
+        print(box)
+        width = box.effective_width
         inner = capitalize_func(
             settings['template'].format(
-                super().format(tag, content, **kwargs)
+                content
             )
         )
         underline = ""
         if settings['underlined']:
             underline_len = width if settings['underline_full'] else len(inner)
             underline = "{}".format(settings['underline_char'] * underline_len, width)
-        return "{}{}\n{}{}".format(
-            "\n"*settings['lines_above'],
-            center_func(inner, width),
-            center_func(underline, width),
-            "\n"*settings['lines_below']
-        )
+            return super().format(
+                tag,
+                "{}\n{}".format(
+                    center_func(inner, width),
+                    center_func(underline, width),
+                ),
+                **kwargs
+            )
+        else:
+            return super().format(
+                tag,
+                center_func(inner, width),
+                **kwargs
+            )
+        # return "{}{}\n{}{}".format(
+        #     "\n"*settings['margin_top'],
+        #     center_func(inner, width),
+        #     center_func(underline, width),
+        #     "\n"*settings['margin_bottom']
+        # )
 
 
 class ParagraphFormatter(Formatter):
@@ -367,7 +479,7 @@ default_h1_formatter = HeaderFormatter(
     centered=True,
     underlined=True,
     underline_full=True,
-    lines_above=2,
+    margin_top=3,
 )
 
 default_h2_formatter = HeaderFormatter(

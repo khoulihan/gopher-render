@@ -8,6 +8,7 @@ from .formatting import default_h3_formatter, default_p_formatter
 from .formatting import default_pre_formatter, default_code_formatter
 from .formatting import default_link_formatter, default_extracted_link_formatter
 from .formatting import default_em_formatter, default_strong_formatter
+from .formatting import Box
 
 
 class TagParser(object):
@@ -21,16 +22,25 @@ class TagParser(object):
         self.formatter = formatter
         self._context = context
 
-    def render(self):
-        rendered = []
-        for c in self.children:
-            rendered.append(c.render())
+    def render(self, box):
         format_context = dict(
             parent=self.parent,
             children=self.children,
             attrs=self.attrs,
+            parent_box=box,
         )
         format_context.update(self._context)
+        box = self.formatter.get_box(
+            self.tag,
+            format_context
+        )
+
+        rendered = []
+        for c in self.children:
+            rendered.append(
+                c.render(box)
+            )
+
         return self.formatter(
             self.tag,
             "".join(rendered),
@@ -127,28 +137,40 @@ class LinkParser(TagParser):
     # For links, this generally renders the contents of the tag in its
     # original location, unless 'link_placement' is 'inline', in which case
     # link rendering occurs in the original location.
-    def render(self):
+    def render(self, box):
         if self._context['link_placement'] != 'inline':
-            return super().render()
-        return self.link_render()
+            return super().render(box)
+        return self.link_render(box)
 
-    def link_render(self):
+    def link_render(self, box):
         """
         Render an extracted link.
         """
-        rendered = []
-        for c in self.children:
-            rendered.append(c.render())
-        rendered_text = "".join(rendered)
         format_context = dict(
             parent=self.parent,
             children=self.children,
             attrs=self.attrs,
             href=self.href,
             title=self.title,
-            gopher_link=self.gopher_link
+            gopher_link=self.gopher_link,
+            parent_box=box
         )
         format_context.update(self._context)
+
+        # Not sure that adjusting the box for links is going to work too well
+        # Certainly for gopher links the box should be ignored entirely.
+        box = self.formatter.get_box(
+            self.tag,
+            format_context
+        )
+
+        rendered = []
+        for c in self.children:
+            rendered.append(
+                c.render(box)
+            )
+        rendered_text = "".join(rendered)
+
         return self.link_formatter(
             self.tag,
             rendered_text,
@@ -162,7 +184,7 @@ class DataParser(TagParser):
         self.data = data
         self.closed = True
 
-    def render(self):
+    def render(self, box):
         return self.data
 
 
@@ -171,6 +193,7 @@ class GopherHTMLParser(HTMLParser):
     def __init__(
         self,
         width=67,
+        box=None,
         formatters={},
         output_format='text',
         link_placement='footer',
@@ -185,7 +208,14 @@ class GopherHTMLParser(HTMLParser):
         self._parsed = []
         self.parsed = ""
         self._tag_stack = []
-        self._width = width
+        #self._width = width
+        if box:
+            self._box = box
+        else:
+            # TODO: Maybe a default top margin as well?
+            self._box = Box(
+                width=67
+            )
         self._output_format = output_format
         self._link_placement = link_placement
         self._gopher_host = gopher_host
@@ -231,7 +261,6 @@ class GopherHTMLParser(HTMLParser):
                 attrs,
                 formatter[0],
                 formatter[1],
-                width=self._width,
                 output_format=self._output_format,
                 link_placement=self._link_placement,
                 link_number=self._next_link_number,
@@ -247,7 +276,6 @@ class GopherHTMLParser(HTMLParser):
                 parent,
                 attrs,
                 formatter,
-                width=self._width,
             )
         self._tag_stack.append(t)
         if parent:
@@ -268,7 +296,7 @@ class GopherHTMLParser(HTMLParser):
             # after the closed tag if link_placement is 'after_block'
             self._tag_stack.pop()
             if top.parent is None and len(self._tag_stack) == 0:
-                self._parsed.append(top.render())
+                self._parsed.append(top.render(self._box))
 
     def handle_data(self, data):
         parent = self._get_top()
@@ -278,18 +306,39 @@ class GopherHTMLParser(HTMLParser):
         else:
             # No containing tags, so just dump directly to the output
             # Not an ideal scenario
-            self._parsed.append(d.render())
+            self._parsed.append(d.render(None))
+
+    def _indent_body(self):
+        box = self._box
+        parsed = "".join(self._parsed)
+        lines = parsed.splitlines(keepends=True)
+        return "".join([
+            "{}{}".format(' ' * self._box.left, l)
+            for l in lines
+        ])
 
     def close(self):
         super().close()
         # Compile the parsed string
         for t in self._tag_stack:
-            self._parsed.append(t.render())
+            self._parsed.append(t.render(self._box))
         if self._link_placement == 'footer' and len(self._pending_links) > 0:
             self._parsed.append("\n")
             for l in self._pending_links:
-                self._parsed.append(l.link_render())
-        self.parsed = "".join(self._parsed)
+                self._parsed.append(l.link_render(self._box))
+
+        # TODO: Some variation here within our box model:
+        # Gophermap links should definitely not be indented, but this naively
+        # indents everything. If link placement is footer this should be easy
+        # enough to avoid, but for inter-block links it will be troublesome.
+        # Could perhaps identify the points where links need to be inserted
+        # and indent everything around them separately.
+        indented = self._indent_body()
+        self.parsed = "{}{}{}".format(
+            "\n" * self._box.top,
+            indented,
+            "\n" * self._box.bottom
+        )
 
     def reset(self):
         super().reset()
