@@ -8,7 +8,7 @@ from .formatting import default_h3_formatter, default_p_formatter
 from .formatting import default_pre_formatter, default_code_formatter
 from .formatting import default_link_formatter, default_extracted_link_formatter
 from .formatting import default_em_formatter, default_strong_formatter
-from .formatting import Box
+from .formatting import Box, BoxSide
 
 
 class TagParser(object):
@@ -313,7 +313,7 @@ class GopherHTMLParser(HTMLParser):
         parsed = "".join(self._parsed)
         lines = parsed.splitlines(keepends=True)
         return "".join([
-            "{}{}".format(' ' * self._box.left, l)
+            "{}{}".format(' ' * self._box.margin[BoxSide.LEFT], l)
             for l in lines
         ])
 
@@ -333,11 +333,12 @@ class GopherHTMLParser(HTMLParser):
         # enough to avoid, but for inter-block links it will be troublesome.
         # Could perhaps identify the points where links need to be inserted
         # and indent everything around them separately.
+        # Addition of padding and border to box model complicate this even further
         indented = self._indent_body()
         self.parsed = "{}{}{}".format(
-            "\n" * self._box.top,
+            "\n" * self._box.margin[BoxSide.TOP],
             indented,
-            "\n" * self._box.bottom
+            "\n" * self._box.margin[BoxSide.BOTTOM]
         )
 
     def reset(self):

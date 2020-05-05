@@ -79,6 +79,13 @@ def capitalize(text):
     return text.capitalize()
 
 
+class BoxSide:
+    TOP = 0
+    RIGHT = 1
+    BOTTOM = 2
+    LEFT = 3
+
+
 class Box(object):
     """
     A rudimentary nesting box model where left and right margins are inherited.
@@ -86,43 +93,75 @@ class Box(object):
     def __init__(
         self,
         width=67,
-        left=0,
-        right=0,
-        top=0,
-        bottom=0,
+        margin=[0,0,0,0],
+        padding=[0,0,0,0],
+        border=[0,0,0,0],
         parent=None
     ):
+        if margin == None:
+            margin = [0,0,0,0]
+        if padding == None:
+            padding = [0,0,0,0]
+        if border == None:
+            border = [0,0,0,0]
         self.width = width
-        self.left = left
-        self.total_left = left
-        self.right = right
-        self.total_right = right
-        self.top = top
-        self.bottom = bottom
+        self.margin = margin[:]
+        # TOP and BOTTOM are ignored in these totals
+        self.total_margin = margin[:]
+        self.padding = padding[:]
+        self.total_padding = padding[:]
+        self.border = border[:]
+        self.total_border = border[:]
         self.parent = parent
         # If a parent was provided, its width overrides the provided width
         # and its margins are added to the provided margins to give total margins
         if parent:
             self.parent = parent
             self.width = parent.width
-            self.total_left = self.left + parent.total_left
-            self.total_right = self.right + parent.total_right
+            self.total_margin[BoxSide.LEFT] = self.margin[BoxSide.LEFT] + parent.total_margin[BoxSide.LEFT]
+            self.total_margin[BoxSide.RIGHT] = self.margin[BoxSide.RIGHT] + parent.total_margin[BoxSide.RIGHT]
+            self.total_padding[BoxSide.LEFT] = self.padding[BoxSide.LEFT] + parent.total_padding[BoxSide.LEFT]
+            self.total_padding[BoxSide.RIGHT] = self.padding[BoxSide.RIGHT] + parent.total_padding[BoxSide.RIGHT]
+            self.total_border[BoxSide.LEFT] = self.border[BoxSide.LEFT] + parent.total_border[BoxSide.LEFT]
+            self.total_border[BoxSide.RIGHT] = self.border[BoxSide.RIGHT] + parent.total_border[BoxSide.RIGHT]
 
-    def effective_width():
-        doc = "The width actually available to the element."
+    def inner_width():
+        doc = "The width actually available to the element's inner content."
         def fget(self):
-            return self.width - (self.total_left + self.total_right)
+            return self.width - (
+                self.total_margin[BoxSide.LEFT] + self.total_margin[BoxSide.RIGHT] +
+                self.total_padding[BoxSide.LEFT] + self.total_padding[BoxSide.RIGHT] +
+                self.total_border[BoxSide.LEFT] + self.total_border[BoxSide.RIGHT]
+            )
         return locals()
-    effective_width = property(**effective_width())
+    inner_width = property(**inner_width())
+
+    def padded_width():
+        doc = "The width of the element including the padding."
+        def fget(self):
+            return self.width - (
+                self.total_margin[BoxSide.LEFT] + self.total_margin[BoxSide.RIGHT] +
+                self.total_border[BoxSide.LEFT] + self.total_border[BoxSide.RIGHT]
+            )
+        return locals()
+    padded_width = property(**padded_width())
+
+    def bordered_width():
+        doc = "The width of the element including the padding."
+        def fget(self):
+            return self.width - (
+                self.total_margin[BoxSide.LEFT] + self.total_margin[BoxSide.RIGHT]
+            )
+        return locals()
+    bordered_width = property(**bordered_width())
 
     def __repr__(self):
-        return "Box [ t: {}, b: {}, l: {}, r: {}, w: {}, ew: {} ]".format(
-            self.top,
-            self.bottom,
-            self.left,
-            self.right,
+        return "Box [ m: {}, p: {}, b: {}, w: {}, iw: {} ]".format(
+            self.margin,
+            self.padding,
+            self.border,
             self.width,
-            self.effective_width
+            self.inner_width
         )
 
 
@@ -151,12 +190,14 @@ class Formatter(object):
         override this to change formatting behaviour based on tag, classes,
         or other attributes.
         """
-        return self.defaults
+        return self.defaults.copy()
 
     def __call__(self, tag, content, **kwargs):
         kwargs['classes'] = self.__extract_classes(
             kwargs.get('attrs', {})
         )
+        kwargs['settings'] = self._get_format(tag, **kwargs)
+        kwargs['box'] = self.get_box(tag, kwargs)
         return self.format(tag, content, **kwargs)
 
     def get_box(self, tag, context):
@@ -175,7 +216,18 @@ class Formatter(object):
         return content
 
 
-class BoxFormatter(Formatter):
+class BlockFormatter(Formatter):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **dict(
+            border_strs=['','','','']
+        ))
+        self.defaults.update(kwargs)
+        border = self.defaults['border_strs']
+        print (border)
+        self.defaults['border'] = [ len(b) for b in border ]
+        print (self.defaults['border'])
+
     def get_box(self, tag, context):
         """
         Get a box adjusted for the context.
@@ -183,36 +235,94 @@ class BoxFormatter(Formatter):
         This class adds a left and right margin if set for the formatter.
         """
         parent = context.get('parent_box', None)
+        settings = context.get('settings', None)
+        # TODO: This results in the settings being aggregated twice, which
+        # is unfortunate...
+        if settings == None:
+            settings = self._get_format(tag, **context)
         if parent:
-            left = self.defaults.get('margin_left', 0)
-            right = self.defaults.get('margin_right', 0)
-            top = self.defaults.get('margin_top', 0)
-            bottom = self.defaults.get('margin_bottom', 0)
+            margin = settings.get('margin', None)
+            padding = settings.get('padding', None)
+            border = settings.get('border', None)
             return Box(
-                top=top,
-                bottom=bottom,
-                left=left,
-                right=right,
+                margin=margin,
+                padding=padding,
+                border=border,
                 parent=parent
             )
         return None
 
-    def format(self, tag, content, **kwargs):
-        box = self.get_box(tag, kwargs)
+    def _outer_format(self, tag, content, **kwargs):
+        box = kwargs['box']
         # Not sure if splitlines of split('\n') is best here
         lines = content.splitlines(keepends=True)
         indented = "".join([
-            "{}{}".format(' ' * box.left, l)
+            "{}{}".format(' ' * box.margin[BoxSide.LEFT], l)
             for l in lines
         ])
         return "{}{}{}".format(
-            '\n' * box.top,
+            '\n' * box.margin[BoxSide.TOP],
             indented,
-            '\n' * box.bottom,
+            '\n' * box.margin[BoxSide.BOTTOM],
+        )
+
+    def _inner_format(self, tag, content, **kwargs):
+        # TODO: This should really be wrapped, since the boxing depends on
+        # the width of the content being correct.
+        return content
+
+    def _border_format(self, tag, content, **kwargs):
+        box = kwargs['box']
+        settings = kwargs['settings']
+        borders = settings['border_strs']
+        # Not sure if splitlines of split('\n') is best here
+        lines = content.split('\n')
+        padded = [
+            "{}{}{}{}{}".format(
+                borders[BoxSide.LEFT],
+                ' ' * box.padding[BoxSide.LEFT],
+                l,
+                ' ' * (box.padded_width - (box.padding[BoxSide.LEFT] + len(l))),
+                borders[BoxSide.RIGHT]
+            ) for l in lines
+        ]
+
+        vertical_pad = "{}{}{}".format(
+            borders[BoxSide.LEFT],
+            ' ' * box.padded_width,
+            borders[BoxSide.RIGHT]
+        )
+        if box.padding[BoxSide.TOP] > 0:
+            padded[0:0] = [vertical_pad] * box.padding[BoxSide.TOP]
+        if box.padding[BoxSide.BOTTOM] > 0:
+            padded.extend([vertical_pad] * box.padding[BoxSide.BOTTOM])
+
+        if box.border[BoxSide.TOP] > 0:
+            for c in borders[BoxSide.TOP][::-1]:
+                padded.insert(0, c * box.bordered_width)
+        if box.border[BoxSide.BOTTOM] > 0:
+            for c in borders[BoxSide.BOTTOM]:
+                padded.append(c * box.bordered_width)
+
+        return "\n".join(padded)
+
+    def format(self, tag, content, **kwargs):
+        return self._outer_format(
+            tag,
+            self._border_format(
+                tag,
+                self._inner_format(
+                    tag,
+                    content,
+                    **kwargs
+                ),
+                **kwargs
+            ),
+            **kwargs
         )
 
 
-class HeaderFormatter(BoxFormatter):
+class HeaderFormatter(BlockFormatter):
     """
     template="{}",
     centered=True,
@@ -225,54 +335,38 @@ class HeaderFormatter(BoxFormatter):
     """
 
     def __init__(self, *args, **kwargs):
-        self.defaults = dict(
+        defaults = dict(
             template="{}",
             centered=True,
             capitalized=False,
             underlined=False,
             underline_char="=",
             underline_full=False,
-            margin_top=1,
-            margin_bottom=2
+            margin=[2,0,1,0]
         )
-        self.defaults.update(kwargs)
+        defaults.update(kwargs)
+        super().__init__(*args, **defaults)
 
-    def format(self, tag, content, **kwargs):
-        settings = self._get_format(tag, **kwargs)
+    def _inner_format(self, tag, content, **kwargs):
+        settings = kwargs['settings']
         center_func = center if settings['centered'] else _noop
         capitalize_func = capitalize if settings['capitalized'] else _noop
-        box = self.get_box(tag, kwargs)
+        box = kwargs['box']
         print(box)
-        width = box.effective_width
-        inner = capitalize_func(
-            settings['template'].format(
-                content
-            )
+        width = box.inner_width
+        inner = settings['template'].format(
+            capitalize_func(content)
         )
         underline = ""
         if settings['underlined']:
             underline_len = width if settings['underline_full'] else len(inner)
             underline = "{}".format(settings['underline_char'] * underline_len, width)
-            return super().format(
-                tag,
-                "{}\n{}".format(
-                    center_func(inner, width),
-                    center_func(underline, width),
-                ),
-                **kwargs
+            return "{}\n{}".format(
+                center_func(inner, width),
+                center_func(underline, width),
             )
         else:
-            return super().format(
-                tag,
-                center_func(inner, width),
-                **kwargs
-            )
-        # return "{}{}\n{}{}".format(
-        #     "\n"*settings['margin_top'],
-        #     center_func(inner, width),
-        #     center_func(underline, width),
-        #     "\n"*settings['margin_bottom']
-        # )
+            return center_func(inner, width)
 
 
 class ParagraphFormatter(Formatter):
@@ -479,20 +573,28 @@ default_h1_formatter = HeaderFormatter(
     centered=True,
     underlined=True,
     underline_full=True,
-    margin_top=3,
+    margin=[3,0,1,0],
+    padding=[2,5,2,5],
+    border_strs=['=', '.::||', '=', '||::.']
 )
 
 default_h2_formatter = HeaderFormatter(
     centered=True,
     underlined=True,
     underline_full=False,
+    margin=[3,0,1,0],
+    padding=[2,4,2,4],
+    border_strs=['~', '|+|', '~', '|+|']
 )
 
 default_h3_formatter = HeaderFormatter(
     centered=True,
-    underlined=True,
+    underlined=False,
     underline_full=False,
     underline_char='-',
+    margin=[3,0,1,0],
+    padding=[1,4,1,4],
+    border_strs=['-', '|', '-', '|']
 )
 
 default_p_formatter = ParagraphFormatter()

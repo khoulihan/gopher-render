@@ -48,10 +48,7 @@ def main():
         gopher_host="my.gopher.com",
         box=Box(
             width=67,
-            left=10,
-            right=10,
-            top=0,
-            bottom=0
+            margin=[1,10,1,10]
         )
     )
     parser.feed(md_parsed)
