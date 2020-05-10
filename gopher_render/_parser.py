@@ -2,49 +2,61 @@ from html.parser import HTMLParser
 import textwrap
 from urllib.parse import urlparse
 
-from .formatting import full_justify
-from .formatting import null_formatter, default_h1_formatter, default_h2_formatter
-from .formatting import default_h3_formatter, default_p_formatter
-from .formatting import default_pre_formatter, default_code_formatter
-from .formatting import default_link_formatter, default_extracted_link_formatter
-from .formatting import default_em_formatter, default_strong_formatter
-from .formatting import Box, BoxSide
+from .rendering import full_justify
+
+from .rendering import Box, BoxSide
+from .rendering import Renderer, InlineRenderer, BlockRenderer
+from .rendering import HeaderRenderer, MarkdownHeaderRenderer
+from .rendering import ParagraphRenderer
+from .rendering import CodeRenderer, PreRenderer
+from .rendering import EmRenderer, StrongRenderer
+from .rendering import UnderlineRenderer, StrikethroughRenderer
+from .rendering import LinkRenderer, ExtractedLinkRenderer
 
 
+# TODO: Maybe this class should do more actual parsing? Or just rename to Tag
 class TagParser(object):
 
-    def __init__(self, tag, parent, attrs, formatter, **context):
+    def __init__(self, tag, parent, attrs, renderer, **context):
         self.tag = tag
         self.parent = parent
         self.children = []
         self.closed = False
         self.attrs = attrs
-        self.formatter = formatter
+        self.renderer = renderer
         self._context = context
 
+    # TODO: I think I found a better way to do this, but I can't remember where.
+    # dict(*attrs) or something..
+    def __extract_classes(self, attrs):
+        classes = ""
+        for attr in attrs:
+            if attr[0] == 'class':
+                classes = attr[1]
+        return classes.split()
+
     def render(self, box):
-        format_context = dict(
-            parent=self.parent,
-            children=self.children,
-            attrs=self.attrs,
+        render_context = dict(
             parent_box=box,
         )
-        format_context.update(self._context)
-        box = self.formatter.get_box(
-            self.tag,
-            format_context
-        )
+        render_context.update(self._context)
 
-        rendered = []
+        render_inst = self.renderer(self, **render_context)
+        try:
+            box = render_inst.box
+        except AttributeError:
+            # If the renderer doesn't provide a box then the parent's gets
+            # passed through.
+            pass
+
+        rendered_children = []
         for c in self.children:
-            rendered.append(
+            rendered_children.append(
                 c.render(box)
             )
 
-        return self.formatter(
-            self.tag,
-            "".join(rendered),
-            **format_context
+        return render_inst.render(
+            "".join(rendered_children)
         )
 
 
@@ -55,18 +67,18 @@ class LinkParser(TagParser):
         tag,
         parent,
         attrs,
-        formatter,
-        link_formatter,
+        renderer,
+        link_renderer,
         **context
     ):
         super().__init__(
             tag,
             parent,
             attrs,
-            formatter,
+            renderer,
             **context
         )
-        self.link_formatter = link_formatter
+        self.link_renderer = link_renderer
         self.href = None
         # If set, this will be used as the link description
         self.title = None
@@ -146,35 +158,33 @@ class LinkParser(TagParser):
         """
         Render an extracted link.
         """
-        format_context = dict(
-            parent=self.parent,
-            children=self.children,
-            attrs=self.attrs,
+        render_context = dict(
             href=self.href,
             title=self.title,
             gopher_link=self.gopher_link,
             parent_box=box
         )
-        format_context.update(self._context)
+        render_context.update(self._context)
 
-        # Not sure that adjusting the box for links is going to work too well
-        # Certainly for gopher links the box should be ignored entirely.
-        box = self.formatter.get_box(
-            self.tag,
-            format_context
-        )
+        if render_context["link_placement"] == "inline":
+            render_inst = self.renderer(self, **render_context)
+        else:
+            render_inst = self.link_renderer(self, **render_context)
+        try:
+            box = render_inst.box
+        except AttributeError:
+            # If the renderer doesn't provide a box then the parent's gets
+            # passed through.
+            pass
 
-        rendered = []
+        rendered_children = []
         for c in self.children:
-            rendered.append(
+            rendered_children.append(
                 c.render(box)
             )
-        rendered_text = "".join(rendered)
 
-        return self.link_formatter(
-            self.tag,
-            rendered_text,
-            **format_context
+        return render_inst.render(
+            "".join(rendered_children)
         )
 
 
@@ -194,7 +204,7 @@ class GopherHTMLParser(HTMLParser):
         self,
         width=67,
         box=None,
-        formatters={},
+        renderers={},
         output_format='text',
         link_placement='footer',
         gopher_host="",
@@ -220,19 +230,23 @@ class GopherHTMLParser(HTMLParser):
         self._link_placement = link_placement
         self._gopher_host = gopher_host
         self._gopher_port = gopher_port
-        self.formatters = {
-            '': null_formatter,
-            'h1': default_h1_formatter,
-            'h2': default_h2_formatter,
-            'h3': default_h3_formatter,
-            'p': default_p_formatter,
-            'pre': default_pre_formatter,
-            'code': default_code_formatter,
-            'a': (default_link_formatter, default_extracted_link_formatter),
-            'em': default_em_formatter,
-            'strong': default_strong_formatter,
+        self.renderers = {
+            '': Renderer,
+            'h1': MarkdownHeaderRenderer,
+            'h2': MarkdownHeaderRenderer,
+            'h3': MarkdownHeaderRenderer,
+            'p': ParagraphRenderer,
+            'pre': PreRenderer,
+            'code': CodeRenderer,
+            'a': (LinkRenderer, ExtractedLinkRenderer),
+            'em': EmRenderer,
+            'strong': StrongRenderer,
+            'i': EmRenderer,
+            'b': StrongRenderer,
+            'u': UnderlineRenderer,
+            's': StrikethroughRenderer,
         }
-        self.formatters.update(formatters)
+        self.renderers.update(renderers)
         self._next_link_number = 1
         self._pending_links = []
 
@@ -244,26 +258,26 @@ class GopherHTMLParser(HTMLParser):
                 t = None
         return t
 
-    def _get_formatter(self, tag, attrs):
-        formatter = self.formatters.get(tag, None)
-        if not formatter:
-            formatter = self.formatters['']
-        return formatter
+    def _get_renderer(self, tag, attrs):
+        renderer = self.renderers.get(tag, None)
+        if not renderer:
+            renderer = self.renderers['']
+        return renderer
 
     def handle_starttag(self, tag, attrs):
         parent = self._get_top()
-        formatter = self._get_formatter(tag, attrs)
+        renderer = self._get_renderer(tag, attrs)
         t = None
         if tag == 'a':
             t = LinkParser(
                 tag,
                 parent,
                 attrs,
-                formatter[0],
-                formatter[1],
+                renderer[0],
+                renderer[1],
                 output_format=self._output_format,
                 link_placement=self._link_placement,
-                link_number=self._next_link_number,
+                link_reference=self._next_link_number,
                 gopher_host=self._gopher_host,
                 gopher_port=self._gopher_port,
             )
@@ -275,7 +289,7 @@ class GopherHTMLParser(HTMLParser):
                 tag,
                 parent,
                 attrs,
-                formatter,
+                renderer,
             )
         self._tag_stack.append(t)
         if parent:

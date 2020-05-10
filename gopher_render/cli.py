@@ -4,7 +4,7 @@ import markdown
 from markdown.extensions import codehilite
 import pygments
 from . import GopherHTMLParser
-from .formatting import Box
+from .rendering import Box
 
 def _parse_arguments():
     parser = argparse.ArgumentParser(description="Convert Markdown or HTML to plain text or gophermaps")
@@ -20,22 +20,22 @@ def main():
     with open(args.source, 'r') as in_file:
         source_text = in_file.read()
 
-    # md = markdown.Markdown(extensions=['markdown.extensions.codehilite', 'markdown.extensions.extra', 'markdown.extensions.meta'], **{
-    #     'extension_configs': {
-    #         'markdown.extensions.codehilite': {'css_class': 'highlight'},
-    #         'markdown.extensions.extra': {},
-    #         'markdown.extensions.meta': {},
-    #     },
-    #     'output_format': 'html5',
-    # })
-
-    # This version is for checking that default code blocks work ok
-    md = markdown.Markdown(extensions=['markdown.extensions.meta'], **{
+    md = markdown.Markdown(extensions=['markdown.extensions.codehilite', 'markdown.extensions.extra', 'markdown.extensions.meta'], **{
         'extension_configs': {
+            'markdown.extensions.codehilite': {'css_class': 'highlight'},
+            'markdown.extensions.extra': {},
             'markdown.extensions.meta': {},
         },
         'output_format': 'html5',
     })
+
+    # This version is for checking that default code blocks work ok
+    # md = markdown.Markdown(extensions=['markdown.extensions.meta'], **{
+    #     'extension_configs': {
+    #         'markdown.extensions.meta': {},
+    #     },
+    #     'output_format': 'html5',
+    # })
 
     #md = markdown.Markdown()
     md_parsed = md.convert(source_text)
@@ -44,12 +44,13 @@ def main():
         print(md_parsed)
 
     parser = GopherHTMLParser(
-        output_format="gophermap",
+        output_format="text",
         gopher_host="my.gopher.com",
         box=Box(
             width=67,
-            margin=[1,10,1,10]
-        )
+            margin=[1,0,1,0]
+        ),
+        link_placement='footer'
     )
     parser.feed(md_parsed)
     parser.close()
