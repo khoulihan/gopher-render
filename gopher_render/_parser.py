@@ -7,7 +7,7 @@ from .rendering import full_justify
 from .rendering import Box, BoxSide
 from .rendering import Renderer, InlineRenderer, BlockRenderer
 from .rendering import HeaderRenderer, MarkdownHeaderRenderer
-from .rendering import ParagraphRenderer
+from .rendering import ParagraphRenderer, BlockQuoteRenderer
 from .rendering import CodeRenderer, PreRenderer
 from .rendering import EmRenderer, StrongRenderer
 from .rendering import UnderlineRenderer, StrikethroughRenderer
@@ -236,6 +236,7 @@ class GopherHTMLParser(HTMLParser):
             'h2': MarkdownHeaderRenderer,
             'h3': MarkdownHeaderRenderer,
             'p': ParagraphRenderer,
+            'blockquote': BlockQuoteRenderer,
             'pre': PreRenderer,
             'code': CodeRenderer,
             'a': (LinkRenderer, ExtractedLinkRenderer),

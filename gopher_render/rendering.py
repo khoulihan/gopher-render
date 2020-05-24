@@ -108,6 +108,7 @@ class Box(object):
         margin=[0,0,0,0],
         padding=[0,0,0,0],
         border=[0,0,0,0],
+        line_template=None,
         parent=None
     ):
         if margin == None:
@@ -124,6 +125,7 @@ class Box(object):
         self.total_padding = padding[:]
         self.border = border[:]
         self.total_border = border[:]
+        self.line_template = line_template
         self.parent = parent
         # If a parent was provided, its width overrides the provided width
         # and its margins are added to the provided margins to give total margins
@@ -136,6 +138,18 @@ class Box(object):
             self.total_padding[BoxSide.RIGHT] = self.padding[BoxSide.RIGHT] + parent.total_padding[BoxSide.RIGHT]
             self.total_border[BoxSide.LEFT] = self.border[BoxSide.LEFT] + parent.total_border[BoxSide.LEFT]
             self.total_border[BoxSide.RIGHT] = self.border[BoxSide.RIGHT] + parent.total_border[BoxSide.RIGHT]
+
+    def _get_line_template_padding(self):
+        """
+        Determine how much extra space is required for the line_template, if one
+        was provided.
+        """
+        if self.line_template == None:
+            return 0
+        # TODO: Should replace this with using the Formatter class to parse
+        # the template, because there may be other ways that the replacement
+        # could be specified.
+        return len(self.line_template) - 2
 
     def inner_width():
         doc = "The width actually available to the element's inner content."
@@ -153,7 +167,8 @@ class Box(object):
         def fget(self):
             return self.width - (
                 self.total_margin[BoxSide.LEFT] + self.total_margin[BoxSide.RIGHT] +
-                self.total_border[BoxSide.LEFT] + self.total_border[BoxSide.RIGHT]
+                self.total_border[BoxSide.LEFT] + self.total_border[BoxSide.RIGHT] +
+                self._get_line_template_padding()
             )
         return locals()
     padded_width = property(**padded_width())
@@ -518,7 +533,19 @@ class ParagraphRenderer(BlockRenderer):
         break_long_words=True,
         skip_for_code_or_pre=True,
         margin=[0,0,1,0],
+        line_template="{}",
     )
+
+    def _generate_box(self):
+        """
+        Create a box adjusted for the context.
+
+        This class adds a left and right margin if set for the formatter, and takes
+        the line_template into account if there is one.
+        """
+        box = super()._generate_box()
+        box.line_template = self.settings.line_template
+        return box
 
     def _skip(self, children):
         return len(children) == 1 and children[0].tag in ['code', 'pre']
@@ -556,7 +583,13 @@ class ParagraphRenderer(BlockRenderer):
         # TODO: Is a block or line template useful here?
         inner = capitalize_func(content)
         #template = settings['template']
-        return justify_func(inner, width, **justify_args)
+        justified = justify_func(inner, width, **justify_args)
+        just_split = justified.split("\n")
+        template = self.settings.line_template
+        return "\n".join(
+            [template.format(line) for line in just_split]
+        )
+
 
 # TODO: Need to differentiate between code spans and code blocks, somehow!
 # 1) This formatter could check if it has siblings by checking the parent's children
@@ -757,4 +790,10 @@ class StrikethroughRenderer(InlineRenderer):
 
     settings = dict(
         template="~~{}~~"
+    )
+
+
+class BlockQuoteRenderer(ParagraphRenderer):
+    settings = dict(
+        line_template="> {}"
     )
