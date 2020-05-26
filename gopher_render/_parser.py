@@ -3,7 +3,8 @@ import textwrap
 from urllib.parse import urlparse
 from collections import namedtuple
 import cssselect
-from cssselect.parser import Element
+
+from ._selectors import tag_matches, more_specific
 
 from .rendering import full_justify
 
@@ -211,57 +212,25 @@ class DataParser(TagParser):
         return self.data
 
 
+class DocumentParser(object):
+    """
+    Implicit root for the document, even if the html being parsed is only a
+    fragment.
+
+    For html tags that are otherwise parentless, an instance of this class will
+    be the parent.
+    """
+    def __init__(self):
+        self.children = []
+
+    def append(self, tag):
+        self.children.append(tag)
+
+    def reset(self):
+        self.children = []
+
+
 RendererMapping = namedtuple('RendererMapping', 'selector, renderer')
-
-
-def _tag_matches(tag, selector):
-    """
-    Determine if a given tag matches a given selector.
-
-    Returns a boolean indicating a match or not, and a value indicating the
-    specificity of the matched selector.
-    """
-    # The selector will actually be a list, though perhaps one with only one
-    # element. If multiple elements match then we need to determine the most
-    # specific one.
-    matched = False
-    best_specificity = None
-    for s in selector:
-        # Simple element only matching for now.
-        if isinstance(s.parsed_tree, Element):
-            if s.parsed_tree.element == tag.tag:
-                if _more_specific(s.specificity, best_specificity):
-                    matched = True
-                    best_specificity = s.specificity
-
-    return matched, best_specificity
-
-
-def _more_specific(specificity1, specificity2):
-    """
-    Returns True if the first argument is more specific than the second,
-    otherwise False.
-
-    Specificity is a concept defined for CSS selectors:
-    https://www.w3.org/TR/selectors/#specificity
-
-    For our purposes, each specificity will be a tuple with three elements.
-    """
-    if specificity1 is None:
-        raise ArgumentError("specificity1 cannot be None")
-    if specificity2 is None:
-        return True
-    if specificity1[0] == specificity2[0]:
-        if specificity1[1] == specificity2[1]:
-            # TODO: If these are equal, should the return be True or False?
-            # If we return True, later entries in the map with equal specificity
-            # will override earlier entries. But will the map order even be
-            # meaningful?
-            return specificity1[2] > specificity2[2]
-        else:
-            return specificity1[1] > specificity2[1]
-    else:
-        return specificity1[0] > specificity2[0]
 
 
 class RendererMap(object):
@@ -279,9 +248,9 @@ class RendererMap(object):
         best = None
         best_specificity = None
         for mapping in self._map:
-            match, specificity = _tag_matches(tag, mapping.selector)
+            match, specificity = tag_matches(tag, mapping.selector)
             if match:
-                if _more_specific(specificity, best_specificity):
+                if more_specific(specificity, best_specificity):
                     best = mapping
                     best_specificity = specificity
         return best
@@ -315,7 +284,7 @@ class GopherHTMLParser(HTMLParser):
         self._parsed = []
         self.parsed = ""
         self._tag_stack = []
-        self.tree = []
+        self.tree = DocumentParser()
         #self._width = width
         if box:
             self._box = box
@@ -370,7 +339,7 @@ class GopherHTMLParser(HTMLParser):
         return renderer
 
     def handle_starttag(self, tag, attrs):
-        parent = self._get_top()
+        parent = self._get_top() or self.tree
         t = None
         if tag == 'a':
             t = LinkParser(
@@ -448,9 +417,9 @@ class GopherHTMLParser(HTMLParser):
                 self.tree.append(t)
 
         # Walk the tree and assign renderers.
-        self._assign_renderers(self.tree)
+        self._assign_renderers(self.tree.children)
 
-        for t in self.tree:
+        for t in self.tree.children:
             self._parsed.append(t.render(self._box))
 
         if self._link_placement == 'footer' and len(self._pending_links) > 0:
@@ -477,6 +446,6 @@ class GopherHTMLParser(HTMLParser):
         self._parsed = []
         self.parsed = ""
         self._tag_stack = []
-        self.tree = []
+        self.tree = DocumentParser()
         self._next_link_number = 1
         self._pending_links = []
