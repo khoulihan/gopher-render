@@ -30,6 +30,7 @@ class TagParser(object):
             self.classes = self.__extract_classes()
             self.id = self.attrs.get('id', None)
         self.renderer = None
+        self.renderer_settings = None
         self._context = context
 
     def __extract_classes(self):
@@ -39,13 +40,20 @@ class TagParser(object):
         return []
 
     def assign_renderer(self, renderer):
-        self.renderer = renderer
+        try:
+            self.renderer = renderer[0]
+            self.renderer_settings = renderer[1]
+        except TypeError:
+            self.renderer = renderer
 
     def render(self, box):
         render_context = dict(
             parent_box=box,
         )
         render_context.update(self._context)
+
+        if self.renderer_settings is not None:
+            render_context['settings'] = self.renderer_settings
 
         render_inst = self.renderer(self, **render_context)
         try:

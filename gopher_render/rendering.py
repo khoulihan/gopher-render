@@ -317,8 +317,11 @@ class Renderer(metaclass=_RendererMeta):
         """
         Adjust the formatting settings.
         """
-        # Nothing to do in the base implementation
-        pass
+        # If there is a settings dictionary in the context, update the
+        # settings with that.
+        local_settings = self.context.get('settings', None)
+        if local_settings is not None:
+            self.settings.update(local_settings)
 
     def render(self, content):
         """
@@ -512,6 +515,7 @@ class MarkdownHeaderRenderer(HeaderRenderer):
         """
         Adjust the formatting settings.
         """
+        super()._adjust_settings()
         # TODO: Check that the tag is actually a header!
         h_type = int(self.tag.tag[1])
         hashes = "#" * h_type
