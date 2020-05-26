@@ -22,19 +22,21 @@ class TagParser(object):
         self.parent = parent
         self.children = []
         self.closed = False
-        self.attrs = attrs
+        self.attrs = {}
+        self.classes = []
+        self.id = None
+        if attrs is not None:
+            self.attrs = dict(attrs)
+            self.classes = self.__extract_classes()
+            self.id = self.attrs.get('id', None)
         self.renderer = None
         self._context = context
-        # TODO: Extract id and classes here.
 
-    # TODO: I think I found a better way to do this, but I can't remember where.
-    # dict(*attrs) or something..
-    def __extract_classes(self, attrs):
-        classes = ""
-        for attr in attrs:
-            if attr[0] == 'class':
-                classes = attr[1]
-        return classes.split()
+    def __extract_classes(self):
+        if 'class' in self.attrs:
+            self.attrs['class'] = self.attrs['class'].split()
+            return self.attrs['class']
+        return []
 
     def assign_renderer(self, renderer):
         self.renderer = renderer
@@ -80,14 +82,9 @@ class LinkParser(TagParser):
             **context
         )
         self.link_renderer = None
-        self.href = None
         # If set, this will be used as the link description
-        self.title = None
-        for attr in attrs:
-            if attr[0] == 'href':
-                self.href = attr[1]
-            if attr[0] == 'title':
-                self.title = attr[1]
+        self.title = self.attrs.get('title', None)
+        self.href = self.attrs.get('href', None)
         self.gopher_link = self._parse_href()
 
     # TODO: This needs a lot more work to be comprehensive
