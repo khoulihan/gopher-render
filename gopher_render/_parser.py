@@ -1,6 +1,9 @@
 from html.parser import HTMLParser
 import textwrap
 from urllib.parse import urlparse
+from collections import namedtuple
+import cssselect
+from cssselect.parser import Element
 
 from .rendering import full_justify
 
@@ -208,6 +211,90 @@ class DataParser(TagParser):
         return self.data
 
 
+RendererMapping = namedtuple('RendererMapping', 'selector, renderer')
+
+
+def _tag_matches(tag, selector):
+    """
+    Determine if a given tag matches a given selector.
+
+    Returns a boolean indicating a match or not, and a value indicating the
+    specificity of the matched selector.
+    """
+    # The selector will actually be a list, though perhaps one with only one
+    # element. If multiple elements match then we need to determine the most
+    # specific one.
+    matched = False
+    best_specificity = None
+    for s in selector:
+        # Simple element only matching for now.
+        if isinstance(s.parsed_tree, Element):
+            if s.parsed_tree.element == tag.tag:
+                if _more_specific(s.specificity, best_specificity):
+                    matched = True
+                    best_specificity = s.specificity
+
+    return matched, best_specificity
+
+
+def _more_specific(specificity1, specificity2):
+    """
+    Returns True if the first argument is more specific than the second,
+    otherwise False.
+
+    Specificity is a concept defined for CSS selectors:
+    https://www.w3.org/TR/selectors/#specificity
+
+    For our purposes, each specificity will be a tuple with three elements.
+    """
+    if specificity1 is None:
+        raise ArgumentError("specificity1 cannot be None")
+    if specificity2 is None:
+        return True
+    if specificity1[0] == specificity2[0]:
+        if specificity1[1] == specificity2[1]:
+            # TODO: If these are equal, should the return be True or False?
+            # If we return True, later entries in the map with equal specificity
+            # will override earlier entries. But will the map order even be
+            # meaningful?
+            return specificity1[2] > specificity2[2]
+        else:
+            return specificity1[1] > specificity2[1]
+    else:
+        return specificity1[0] > specificity2[0]
+
+
+class RendererMap(object):
+    """
+    Provides a mapping of CSS selectors to Renderer specifications.
+    """
+
+    def __init__(self, renderer_dict):
+        self._map = []
+        for key in renderer_dict:
+            selector = cssselect.parse(key)
+            self._map.append(RendererMapping(selector, renderer_dict[key]))
+
+    def _get_for_tag(self, tag):
+        best = None
+        best_specificity = None
+        for mapping in self._map:
+            match, specificity = _tag_matches(tag, mapping.selector)
+            if match:
+                if _more_specific(specificity, best_specificity):
+                    best = mapping
+                    best_specificity = specificity
+        return best
+
+    def __getitem__(self, key):
+        if not isinstance(key, TagParser):
+            raise TypeError("Key must be a TagParser object")
+        item = self._get_for_tag(key)
+        if item is None:
+            raise KeyError("No match found for tag")
+        return item.renderer
+
+
 class GopherHTMLParser(HTMLParser):
     # TODO: Dependency injection so that custom tag rendering classes can be supplied
     def __init__(
@@ -259,6 +346,9 @@ class GopherHTMLParser(HTMLParser):
             's': StrikethroughRenderer,
         }
         self.renderers.update(renderers)
+        self._default_renderer = self.renderers['']
+        del self.renderers['']
+        self._renderer_map = RendererMap(self.renderers)
         self._next_link_number = 1
         self._pending_links = []
 
@@ -270,15 +360,17 @@ class GopherHTMLParser(HTMLParser):
                 t = None
         return t
 
-    def _get_renderer(self, tag, attrs):
-        renderer = self.renderers.get(tag, None)
+    def _get_renderer(self, tag):
+        try:
+            renderer = self._renderer_map[tag] #self.renderers.get(tag, None)
+        except KeyError:
+            renderer = None
         if not renderer:
-            renderer = self.renderers['']
+            renderer = self._default_renderer
         return renderer
 
     def handle_starttag(self, tag, attrs):
         parent = self._get_top()
-        renderer = self._get_renderer(tag, attrs)
         t = None
         if tag == 'a':
             t = LinkParser(
@@ -341,7 +433,7 @@ class GopherHTMLParser(HTMLParser):
 
     def _assign_renderers(self, tags):
         for tag in tags:
-            renderer = self._get_renderer(tag.tag, tag.attrs)
+            renderer = self._get_renderer(tag)
             tag.assign_renderer(renderer)
             self._assign_renderers(tag.children)
 
