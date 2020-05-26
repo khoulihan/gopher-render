@@ -17,14 +17,15 @@ from .rendering import LinkRenderer, ExtractedLinkRenderer
 # TODO: Maybe this class should do more actual parsing? Or just rename to Tag
 class TagParser(object):
 
-    def __init__(self, tag, parent, attrs, renderer, **context):
+    def __init__(self, tag, parent, attrs, **context):
         self.tag = tag
         self.parent = parent
         self.children = []
         self.closed = False
         self.attrs = attrs
-        self.renderer = renderer
+        self.renderer = None
         self._context = context
+        # TODO: Extract id and classes here.
 
     # TODO: I think I found a better way to do this, but I can't remember where.
     # dict(*attrs) or something..
@@ -34,6 +35,9 @@ class TagParser(object):
             if attr[0] == 'class':
                 classes = attr[1]
         return classes.split()
+
+    def assign_renderer(self, renderer):
+        self.renderer = renderer
 
     def render(self, box):
         render_context = dict(
@@ -67,18 +71,15 @@ class LinkParser(TagParser):
         tag,
         parent,
         attrs,
-        renderer,
-        link_renderer,
         **context
     ):
         super().__init__(
             tag,
             parent,
             attrs,
-            renderer,
             **context
         )
-        self.link_renderer = link_renderer
+        self.link_renderer = None
         self.href = None
         # If set, this will be used as the link description
         self.title = None
@@ -146,6 +147,10 @@ class LinkParser(TagParser):
                 port=self._context['gopher_port'],
             )
 
+    def assign_renderer(self, renderer):
+        self.renderer = renderer[0]
+        self.link_renderer = renderer[1]
+
     # For links, this generally renders the contents of the tag in its
     # original location, unless 'link_placement' is 'inline', in which case
     # link rendering occurs in the original location.
@@ -190,7 +195,7 @@ class LinkParser(TagParser):
 
 class DataParser(TagParser):
     def __init__(self, parent, data, **context):
-        super().__init__(None, parent, None, None, **context)
+        super().__init__(None, parent, None, **context)
         self.data = data
         self.closed = True
 
@@ -218,6 +223,7 @@ class GopherHTMLParser(HTMLParser):
         self._parsed = []
         self.parsed = ""
         self._tag_stack = []
+        self.tree = []
         #self._width = width
         if box:
             self._box = box
@@ -274,8 +280,6 @@ class GopherHTMLParser(HTMLParser):
                 tag,
                 parent,
                 attrs,
-                renderer[0],
-                renderer[1],
                 output_format=self._output_format,
                 link_placement=self._link_placement,
                 link_reference=self._next_link_number,
@@ -290,11 +294,12 @@ class GopherHTMLParser(HTMLParser):
                 tag,
                 parent,
                 attrs,
-                renderer,
             )
         self._tag_stack.append(t)
         if parent:
             parent.children.append(t)
+        else:
+            self.tree.append(t)
 
     def handle_endtag(self, tag):
         top = self._get_top()
@@ -310,8 +315,6 @@ class GopherHTMLParser(HTMLParser):
             # TODO: This will have to determine if links should be rendered
             # after the closed tag if link_placement is 'after_block'
             self._tag_stack.pop()
-            if top.parent is None and len(self._tag_stack) == 0:
-                self._parsed.append(top.render(self._box))
 
     def handle_data(self, data):
         parent = self._get_top()
@@ -319,9 +322,8 @@ class GopherHTMLParser(HTMLParser):
         if parent:
             parent.children.append(d)
         else:
-            # No containing tags, so just dump directly to the output
-            # Not an ideal scenario
-            self._parsed.append(d.render(None))
+            # No containing tags, so add directly to the root of the tree
+            self.tree.append(d)
 
     def _indent_body(self):
         box = self._box
@@ -332,11 +334,28 @@ class GopherHTMLParser(HTMLParser):
             for l in lines
         ])
 
+    def _assign_renderers(self, tags):
+        for tag in tags:
+            renderer = self._get_renderer(tag.tag, tag.attrs)
+            tag.assign_renderer(renderer)
+            self._assign_renderers(tag.children)
+
     def close(self):
         super().close()
         # Compile the parsed string
-        for t in self._tag_stack:
+        # Anything being left in _tag_stack probably indicates an unclosed tag...
+        # Pop everything off anyway and add any root tags to the tree.
+        while len(self._tag_stack) > 0:
+            t = self._tag_stack.pop()
+            if t.parent is None:
+                self.tree.append(t)
+
+        # Walk the tree and assign renderers.
+        self._assign_renderers(self.tree)
+
+        for t in self.tree:
             self._parsed.append(t.render(self._box))
+
         if self._link_placement == 'footer' and len(self._pending_links) > 0:
             self._parsed.append("\n")
             for l in self._pending_links:
@@ -361,5 +380,6 @@ class GopherHTMLParser(HTMLParser):
         self._parsed = []
         self.parsed = ""
         self._tag_stack = []
+        self.tree = []
         self._next_link_number = 1
         self._pending_links = []
