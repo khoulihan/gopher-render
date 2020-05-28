@@ -13,19 +13,33 @@ from cssselect.parser import (
 )
 
 
+# Basic match functions
+
 def _element_matches(tag, element):
-    return tag.tag == element.element or element.element == "*"
+    # Unclear if the document root should match anything.
+    # Probably not.
+    if not hasattr(tag, 'tag'):
+        return False
+    # element.element will be None for the universal selector ('*')
+    return tag.tag == element.element or element.element is None
 
 
 def _hash_matches(tag, hash):
-    if tag.id is None:
+    if not hasattr(tag, 'id') or tag.id is None:
         return False
-    return tag.id == hash.id
+    return tag.id == hash.id and (
+        hash.selector is None or
+        _selector_matches(tag, hash.selector)
+    )
 
 
 def _class_matches(tag, klass):
-    return klass.class_name in tag.classes
+    if not hasattr(tag, 'classes') or tag.classes is None:
+        return False
+    return klass.class_name in tag.classes and _selector_matches(tag, klass.selector)
 
+
+# Combination match functions
 
 def _negation_matches(tag, selector):
     return (
@@ -74,7 +88,9 @@ def _general_sibling_matches(tag, selector):
         return False
 
     for sibling in tag.parent.children:
-        if sibling == tag:
+        print (sibling)
+        if sibling is tag:
+            print ("Reached tag")
             return False
         if _selector_matches(sibling, selector.selector):
             return True
@@ -96,7 +112,7 @@ def _adjacent_sibling_matches(tag, selector):
     # it can't have a previous sibling.
     if tag_index == 0:
         return False
-    sibling = tag.parent.children[tag_index]
+    sibling = tag.parent.children[tag_index - 1]
     return _selector_matches(sibling, selector.selector)
 
 
@@ -106,6 +122,8 @@ def _column_matches(tag, selector):
 
 
 def _attribute_matches(tag, selector):
+    if not _selector_matches(tag, selector.selector):
+        return False
     # This selector allows a namespace to be specified as well, but that is
     # not handled here.
     # There are also options related to how to compare the values case-wise
@@ -145,6 +163,55 @@ def _combination_matches(tag, selector):
         return _adjacent_sibling_matches(tag, selector)
     elif selector.combinator == '||':
         return _column_matches(tag, selector)
+    return False
+
+
+# Pseudo Classes
+
+def _nth_child_matches(tag, selector):
+    if not hasattr(tag, 'parent') or tag.parent is None:
+        return False
+    # A lot of ways this could fail!
+    n = int(selector.arguments[0])
+    if len(tag.parent.children) > n:
+        # wat
+        return False
+    return tag.parent.children[n - 1] is tag and _selector_matches(tag, selector.selector)
+
+
+def _nth_last_child_matches(tag, selector):
+    if not hasattr(tag, 'parent') or tag.parent is None:
+        return False
+    # A lot of ways this could fail!
+    n = int(selector.arguments[0])
+    if len(tag.parent.children) > n:
+        # wat
+        return False
+    return tag.parent.children[-n] is tag and _selector_matches(tag, selector.selector)
+
+
+def _first_child_matches(tag, selector):
+    if not hasattr(tag, 'parent') or tag.parent is None:
+        return False
+    if len(tag.parent.children) == 0:
+        # wat
+        return False
+    return tag.parent.children[0] is tag and _selector_matches(tag, selector.selector)
+
+
+def _last_child_matches(tag, selector):
+    if not hasattr(tag, 'parent') or tag.parent is None:
+        return False
+    if len(tag.parent.children) == 0:
+        # wat
+        return False
+    return tag.parent.children[-1] is tag and _selector_matches(tag, selector.selector)
+
+
+_pseudoclasses = {
+    'first-child': _first_child_matches,
+    'last-child': _last_child_matches,
+}
 
 
 def _pseudoclass_matches(tag, selector):
@@ -160,7 +227,18 @@ def _pseudoclass_matches(tag, selector):
     #   :only-of-type
     #   :root (equivalent of 'html' i.e. specify a renderer for the whole document)
     #   :target
+    if selector.ident in _pseudoclasses:
+        return _pseudoclasses[selector.ident](
+            tag,
+            selector
+        )
     return False
+
+
+_pseudofunctions = {
+    'nth-child': _nth_child_matches,
+    'nth-last-child': _nth_last_child_matches,
+}
 
 
 def _pseudofunction_matches(tag, selector):
@@ -177,6 +255,11 @@ def _pseudofunction_matches(tag, selector):
     #   :nth-last-of-type()
     #   :nth-of-type()
     #   :where()
+    if selector.name in _pseudofunctions:
+        return _pseudofunctions[selector.name](
+            tag,
+            selector
+        )
     return False
 
 
@@ -203,6 +286,8 @@ def _selector_matches(tag, selector):
         return _pseudofunction_matches(tag, selector)
     elif isinstance(selector, FunctionalPseudoElement):
         return _pseudoelement_matches(tag, selector)
+    elif isinstance(selector, CombinedSelector):
+        return _combination_matches(tag, selector)
 
     # oh no
     return False
