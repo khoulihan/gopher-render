@@ -4,7 +4,7 @@ from urllib.parse import urlparse
 from collections import namedtuple
 import cssselect
 
-from ._selectors import tag_matches, more_specific
+from ._selectors import tag_matches, Specificity
 
 from .rendering import full_justify
 
@@ -157,8 +157,17 @@ class LinkParser(TagParser):
             )
 
     def assign_renderer(self, renderer):
-        self.renderer = renderer[0]
-        self.link_renderer = renderer[1]
+        try:
+            self.renderer = renderer[0][0]
+            self.renderer_settings = renderer[0][1]
+        except TypeError:
+            self.renderer = renderer[0]
+
+        try:
+            self.link_renderer = renderer[1][0]
+            self.link_renderer_settings = renderer[1][1]
+        except TypeError:
+            self.link_renderer = renderer[1]
 
     # For links, this generally renders the contents of the tag in its
     # original location, unless 'link_placement' is 'inline', in which case
@@ -181,9 +190,16 @@ class LinkParser(TagParser):
         render_context.update(self._context)
 
         if render_context["link_placement"] == "inline":
-            render_inst = self.renderer(self, **render_context)
+            renderer = self.renderer
+            renderer_settings = self.renderer_settings
         else:
-            render_inst = self.link_renderer(self, **render_context)
+            renderer = self.link_renderer
+            renderer_settings = self.link_renderer_settings
+
+        render_inst = renderer(self, **render_context)
+        if renderer_settings is not None:
+            render_context['settings'] = renderer_settings
+
         try:
             box = render_inst.box
         except AttributeError:
@@ -244,33 +260,43 @@ class RendererMap(object):
             selector = cssselect.parse(key)
             self._map.append(RendererMapping(selector, renderer_dict[key]))
 
-    def _get_for_tag(self, tag):
-        best = None
-        best_specificity = None
+    def get_for_tag(self, tag):
+        all_matches = []
         for mapping in self._map:
             match, specificity = tag_matches(tag, mapping.selector)
             if match:
-                if more_specific(specificity, best_specificity):
-                    best = mapping
-                    best_specificity = specificity
-        return best
-
-    def __getitem__(self, key):
-        if not isinstance(key, TagParser):
-            raise TypeError("Key must be a TagParser object")
-        item = self._get_for_tag(key)
-        if item is None:
-            raise KeyError("No match found for tag")
-        return item.renderer
+                all_matches.append(
+                    (
+                        Specificity(specificity),
+                        mapping
+                    )
+                )
+        all_matches.sort(key=lambda m: m[0])
+        renderer = None
+        renderer_settings = {}
+        for s, mapping in all_matches:
+            try:
+                r = mapping.renderer[0]
+                s = mapping.renderer[1]
+            except TypeError:
+                r = mapping.renderer
+                s = None
+            if r is not None:
+                renderer = r
+            if s is not None:
+                renderer_settings.update(s)
+        if not renderer:
+            return None
+        return (renderer, renderer_settings)
 
 
 class GopherHTMLParser(HTMLParser):
-    # TODO: Dependency injection so that custom tag rendering classes can be supplied
     def __init__(
         self,
         width=67,
         box=None,
         renderers={},
+        extracted_link_renderers={},
         output_format='text',
         link_placement='footer',
         gopher_host="",
@@ -306,7 +332,7 @@ class GopherHTMLParser(HTMLParser):
             'blockquote': BlockQuoteRenderer,
             'pre': PreRenderer,
             'code': CodeRenderer,
-            'a': (LinkRenderer, ExtractedLinkRenderer),
+            'a': LinkRenderer,
             'em': EmRenderer,
             'strong': StrongRenderer,
             'i': EmRenderer,
@@ -315,9 +341,14 @@ class GopherHTMLParser(HTMLParser):
             's': StrikethroughRenderer,
         }
         self.renderers.update(renderers)
+        self.extracted_link_renderers = {
+            'a': ExtractedLinkRenderer,
+        }
+        self.extracted_link_renderers.update(extracted_link_renderers)
         self._default_renderer = self.renderers['']
         del self.renderers['']
         self._renderer_map = RendererMap(self.renderers)
+        self._extracted_link_renderer_map = RendererMap(self.extracted_link_renderers)
         self._next_link_number = 1
         self._pending_links = []
 
@@ -330,12 +361,19 @@ class GopherHTMLParser(HTMLParser):
         return t
 
     def _get_renderer(self, tag):
+        renderer = self._renderer_map.get_for_tag(tag)
+        if not renderer:
+            renderer = self._default_renderer
+        return renderer
+
+    def _get_extracted_link_renderer(self, tag):
         try:
-            renderer = self._renderer_map[tag] #self.renderers.get(tag, None)
+            renderer = self._extracted_link_renderer_map.get_for_tag(tag)
         except KeyError:
             renderer = None
         if not renderer:
-            renderer = self._default_renderer
+            # This should have been matched in the map anyway
+            renderer = self.extracted_link_renderers['a']
         return renderer
 
     def handle_starttag(self, tag, attrs):
@@ -403,7 +441,15 @@ class GopherHTMLParser(HTMLParser):
     def _assign_renderers(self, tags):
         for tag in tags:
             renderer = self._get_renderer(tag)
-            tag.assign_renderer(renderer)
+            if tag.tag == 'a':
+                tag.assign_renderer((
+                        renderer,
+                        self._get_extracted_link_renderer(tag)
+                    )
+                )
+            else:
+                tag.assign_renderer(renderer)
+
             self._assign_renderers(tag.children)
 
     def close(self):

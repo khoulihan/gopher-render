@@ -223,14 +223,14 @@ def tag_matches(tag, selector):
     for s in selector:
         is_match = _selector_matches(tag, s.parsed_tree)
         if is_match:
-            if more_specific(s.specificity(), best_specificity):
+            if _more_specific(s.specificity(), best_specificity):
                 matched = True
                 best_specificity = s.specificity()
 
     return matched, best_specificity
 
 
-def more_specific(specificity1, specificity2):
+def _more_specific(specificity1, specificity2):
     """
     Returns True if the first argument is more specific than the second,
     otherwise False.
@@ -240,18 +240,75 @@ def more_specific(specificity1, specificity2):
 
     For our purposes, each specificity will be a tuple with three elements.
     """
+    return _compare_specificity(specificity1, specificity2) > 0
+
+
+def _compare(a, b, c=None):
+    if a == b:
+        if c is None:
+            return 0
+        else:
+            return c
+    else:
+        return a - b
+
+
+def _compare_specificity(specificity1, specificity2):
+    """
+    Determines if one specificity are less than, equal to, or greater than
+    another. Returns -1, 0 or 1 for those cases respectively.
+
+    Specificity is a concept defined for CSS selectors:
+    https://www.w3.org/TR/selectors/#specificity
+
+    For our purposes, each specificity will be a tuple with three elements.
+    """
     if specificity1 is None:
         raise ArgumentError("specificity1 cannot be None")
     if specificity2 is None:
-        return True
-    if specificity1[0] == specificity2[0]:
-        if specificity1[1] == specificity2[1]:
-            # TODO: If these are equal, should the return be True or False?
-            # If we return True, later entries in the map with equal specificity
-            # will override earlier entries. But will the map order even be
-            # meaningful?
-            return specificity1[2] > specificity2[2]
-        else:
-            return specificity1[1] > specificity2[1]
-    else:
-        return specificity1[0] > specificity2[0]
+        return 1
+
+    result = _compare(
+        specificity1[0],
+        specificity2[0],
+        _compare(
+            specificity1[1],
+            specificity2[1],
+            _compare(
+                specificity1[2],
+                specificity2[2],
+            )
+        )
+    )
+    if result > 0:
+        return 1
+    elif result < 0:
+        return -1
+    return result
+
+
+class Specificity(object):
+    """
+    Specificity wrapper to allow for comparisons during sorting.
+    """
+
+    def __init__(self, specificity):
+        self.specificity = specificity
+
+    def __getitem__(self, key):
+        return self.specificity[key]
+
+    def __eq__(self, other):
+        return _compare_specificity(self.specificity, other.specificity) == 0
+
+    def __lt__(self, other):
+        return _compare_specificity(self.specificity, other.specificity) < 0
+
+    def __le__(self, other):
+        return _compare_specificity(self.specificity, other.specificity) <= 0
+
+    def __gt__(self, other):
+        return _compare_specificity(self.specificity, other.specificity) > 0
+
+    def __ge__(self, other):
+        return _compare_specificity(self.specificity, other.specificity) >= 0
