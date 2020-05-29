@@ -172,9 +172,9 @@ def _nth_child_matches(tag, selector):
     if not hasattr(tag, 'parent') or tag.parent is None:
         return False
     # A lot of ways this could fail!
-    n = int(selector.arguments[0])
-    if len(tag.parent.children) > n:
-        # wat
+    # TODO: Apparently this can take arguments like 'odd', 'even', '5n' (every 5th element)
+    n = int(selector.arguments[0].value)
+    if n > len(tag.parent.children):
         return False
     return tag.parent.children[n - 1] is tag and _selector_matches(tag, selector.selector)
 
@@ -183,9 +183,9 @@ def _nth_last_child_matches(tag, selector):
     if not hasattr(tag, 'parent') or tag.parent is None:
         return False
     # A lot of ways this could fail!
-    n = int(selector.arguments[0])
-    if len(tag.parent.children) > n:
-        # wat
+    # TODO: Apparently this can take arguments like 'odd', 'even', '5n' (every 5th element)
+    n = int(selector.arguments[0].value)
+    if n > len(tag.parent.children):
         return False
     return tag.parent.children[-n] is tag and _selector_matches(tag, selector.selector)
 
