@@ -618,7 +618,7 @@ class CodeRenderer(InlineRenderer):
         settings = self.settings
 
         parent = self.tag.parent
-        if parent and parent.tag == 'pre':
+        if parent and hasattr(parent, 'tag') and parent.tag == 'pre':
             # The pre will handle the formatting
             return content
         if '\n' in content:
@@ -631,6 +631,7 @@ class PreRenderer(BlockRenderer):
     settings = dict(
         line_template="{}",
         indent=4,
+        margin=[0,0,1,0],
     )
 
     def _inner_render(self, content):

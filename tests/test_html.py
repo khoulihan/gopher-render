@@ -5,162 +5,205 @@ Test that various HTML tags are rendered correctly.
 from gopher_render import GopherHTMLParser
 
 
-def test_p_tag_default_short():
+class TestDefaults:
     """
-    Default p tag render has a line above and below, and an 8 space indent for
-    the first line.
+    Test the default output formatting for all tags.
+
+    The default output should match markdown formatting
     """
-    html = "<p>Paragraph Text</p>"
-    parser = GopherHTMLParser()
-    parser.feed(html)
-    parser.close()
-    output = parser.parsed
+    def test_p_tag_default_short(self):
+        """
+        Default p tag render has a line below and is left justified.
+        """
+        html = "<p>Paragraph Text</p>"
+        parser = GopherHTMLParser()
+        parser.feed(html)
+        parser.close()
+        output = parser.parsed
 
-    # Blank lines before and after.
-    assert output.startswith("\n")
-    assert output.endswith("\n")
+        # Blank line after.
+        assert output.endswith("\n")
 
-    # No wrapping should occur (line count includes blanks)
-    lines = output.split('\n')
-    assert len(lines) == 3
+        # No wrapping should occur (line count includes blanks)
+        lines = output.split('\n')
+        assert len(lines) == 2
 
-    # Initial line indent
-    assert lines[1].startswith(' ' * 8)
+        # Initial line indent
+        #assert lines[1].startswith(' ' * 8)
 
-    # As it is the only line, it should not be padded on the right.
-    assert lines[1].lstrip() == "Paragraph Text"
-
-
-def test_p_tag_default_long():
-    """
-    Default p tag render has a line above and below, and an 8 space indent for
-    the first line. Long lines are wrapped to 67 characters and full justified.
-    """
-    html = ''.join([
-        "<p>Paragraph Text Paragraph Text Paragraph Text Paragraph Text Paragraph ",
-        "Paragraph Text Paragraph Text Paragraph Text Paragraph Text Paragraph ",
-        "Paragraph Text Paragraph Text Paragraph Text Paragraph Text Paragraph ",
-        "Paragraph Text Paragraph Text Paragraph Text Paragraph Text Paragraph ",
-        "Paragraph Text Paragraph Text Paragraph Text Paragraph Text Paragraph ",
-        "Paragraph Text Paragraph Text Paragraph Text Paragraph Text Paragraph ",
-        "Text Paragraph Text Paragraph Text Paragraph Text</p>"
-    ])
-    parser = GopherHTMLParser()
-    parser.feed(html)
-    parser.close()
-    output = parser.parsed
-
-    # Blank lines before and after.
-    assert output.startswith("\n")
-    assert output.endswith("\n")
-
-    # Wrapping (line count includes blank lines)
-    lines = output.split('\n')
-    assert len(lines) == 10
-
-    # Initial line indent
-    assert lines[1].startswith(' ' * 8)
-
-    # Check that lines are fully justified.
-    for li in range(1, len(lines) - 2):
-        assert len(lines[li]) == 67
-
-    # The final line should not be padded on the right.
-    assert len(lines[-1]) < 67
+        assert lines[0].strip() == "Paragraph Text"
+        assert len(lines[0]) == 67
+        assert lines[1] == ''
 
 
-def test_h1_tag_default():
-    """
-    Default h1 tag render has 2 lines above and 2 below, is centred, and has a
-    full width underline of '=' characters.
-    """
-    html = "<h1>Seventh</h1>"
-    parser = GopherHTMLParser()
-    parser.feed(html)
-    parser.close()
-    output = parser.parsed
+    def test_p_tag_default_long(self):
+        """
+        Default p tag render has a below
+        Long lines are wrapped to 67 characters and full justified.
+        """
+        html = ''.join([
+            "<p>Paragraph Text Paragraph Text Paragraph Text Paragraph Text Paragraph ",
+            "Paragraph Text Paragraph Text Paragraph Text Paragraph Text Paragraph ",
+            "Paragraph Text Paragraph Text Paragraph Text Paragraph Text Paragraph ",
+            "Paragraph Text Paragraph Text Paragraph Text Paragraph Text Paragraph ",
+            "Paragraph Text Paragraph Text Paragraph Text Paragraph Text Paragraph ",
+            "Paragraph Text Paragraph Text Paragraph Text Paragraph Text Paragraph ",
+            "Text Paragraph Text Paragraph Text Paragraph Text</p>"
+        ])
+        parser = GopherHTMLParser()
+        parser.feed(html)
+        parser.close()
+        output = parser.parsed
 
-    # Blank lines before and after
-    assert output.startswith("\n\n")
-    assert output.endswith("\n\n")
+        # Blank line before.
+        assert output.endswith("\n")
 
-    # Blank lines, header, and underline
-    lines = output.split('\n')
-    assert len(lines) == 6
+        # Wrapping (line count includes blank lines)
+        lines = output.split('\n')
+        assert len(lines) == 9
 
-    # Check the centering
-    assert lines[2].startswith(' ' * 30)
-    assert lines[2].endswith(' ' * 30)
-    assert lines[2].strip() == "Seventh"
+        # Initial line indent
+        #assert lines[1].startswith(' ' * 8)
 
-    # Check the underline
-    assert lines[3] == "=" * 67
-
-
-def test_code_span_default():
-    """
-    Default code tag render should just surround the content in backticks.
-    """
-    html = "<code>ClassName</code>"
-    parser = GopherHTMLParser()
-    parser.feed(html)
-    parser.close()
-    output = parser.parsed
-
-    # Surrounded by backticks
-    assert output.startswith("`")
-    assert output.endswith("`")
-
-    # Only one set of backticks, and the content.
-    assert len(output) == 11
-
-    # Just one line
-    lines = output.split('\n')
-    assert len(lines) == 1
+        # Check that lines are fully justified.
+        for li in range(1, len(lines) - 2):
+            assert len(lines[li]) == 67
 
 
-def test_code_span_in_p_default():
-    """
-    Default code tag render should just surround the content in backticks.
+    def _header(self, html, result):
+        parser = GopherHTMLParser()
+        parser.feed(html)
+        parser.close()
+        output = parser.parsed
 
-    This test checks that this works correctly within a p tag.
-    """
-    html = "<p>This paragrah includes a <code>ClassName</code> in a code tag.</p>"
-    parser = GopherHTMLParser()
-    parser.feed(html)
-    parser.close()
-    output = parser.parsed
-
-    # Surrounded by backticks
-    assert output == "\n        This paragrah includes a `ClassName` in a code tag.\n"
+        assert output.strip() == result
+        assert output.endswith('\n')
+        assert len(output) == 68
 
 
-def test_code_block_default():
-    """
-    Where a code tags parent is a pre tag, its content should NOT be surrounded by backticks.
+    def test_h1_tag_default(self):
+        """
+        Default h1 tag render has a line below, and has a # on either side
+        """
+        self._header(
+            "<h1>Seventh</h1>",
+            "# Seventh #"
+        )
 
-    The pre tag content will be indented, and also have a line before and after
-    """
-    code = "\n".join([
-        "def func():",
-        "    print('Some nonsense')",
-        "    return True",
-    ])
-    html = "<pre><code>{}</code></pre>".format(code)
-    parser = GopherHTMLParser()
-    parser.feed(html)
-    parser.close()
-    output = parser.parsed
 
-    # Blank lines before and after.
-    assert output.startswith("\n")
-    assert output.endswith("\n")
+    def test_h2_tag_default(self):
+        """
+        Default h2 tag render has a line below, and has a ## on either side
+        """
+        self._header(
+            "<h2>Seventh</h2>",
+            "## Seventh ##"
+        )
 
-    # No wrapping should occur (line count includes blanks)
-    lines = output.split('\n')
-    assert len(lines) == 5
 
-    codelines = code.split('\n')
+    def test_h3_tag_default(self):
+        """
+        Default h3 tag render has a line below, and has a ### on either side
+        """
+        self._header(
+            "<h3>Seventh</h3>",
+            "### Seventh ###"
+        )
 
-    for li in range(1, 4):
-        assert lines[li] == "    {}".format(codelines[li - 1])
+
+    def test_h4_tag_default(self):
+        """
+        Default h4 tag render has a line below, and has a #### on either side
+        """
+        self._header(
+            "<h4>Seventh</h4>",
+            "#### Seventh ####"
+        )
+
+
+    def test_h5_tag_default(self):
+        """
+        Default h5 tag render has a line below, and has a ##### on either side
+        """
+        self._header(
+            "<h5>Seventh</h5>",
+            "##### Seventh #####"
+        )
+
+
+    def test_h6_tag_default(self):
+        """
+        Default h6 tag render has a line below, and has a ###### on either side
+        """
+        self._header(
+            "<h6>Seventh</h6>",
+            "###### Seventh ######"
+        )
+
+
+    def test_code_span_default(self):
+        """
+        Default code tag render should just surround the content in backticks.
+        """
+        html = "<code>ClassName</code>"
+        parser = GopherHTMLParser()
+        parser.feed(html)
+        parser.close()
+        output = parser.parsed
+
+        # Surrounded by backticks
+        assert output.startswith("`")
+        assert output.endswith("`")
+
+        # Only one set of backticks, and the content.
+        assert len(output) == 11
+
+        # Just one line
+        lines = output.split('\n')
+        assert len(lines) == 1
+
+
+    def test_code_span_in_p_default(self):
+        """
+        Default code tag render should just surround the content in backticks.
+
+        This test checks that this works correctly within a p tag.
+        """
+        html = "<p>This paragrah includes a <code>ClassName</code> in a code tag.</p>"
+        parser = GopherHTMLParser()
+        parser.feed(html)
+        parser.close()
+        output = parser.parsed
+
+        # Surrounded by backticks
+        assert output.strip() == "This paragrah includes a `ClassName` in a code tag."
+
+
+    def test_code_block_default(self):
+        """
+        Where a code tags parent is a pre tag, its content should NOT be surrounded by backticks.
+
+        The pre tag content will be indented, and also have a line after
+        """
+        code = "\n".join([
+            "def func():",
+            "    print('Some nonsense')",
+            "    return True",
+        ])
+        html = "<pre><code>{}</code></pre>".format(code)
+        parser = GopherHTMLParser()
+        parser.feed(html)
+        parser.close()
+        output = parser.parsed
+
+        # Blank lines before and after.
+        assert output.endswith("\n")
+
+        # No wrapping should occur (line count includes blanks)
+        lines = output.split('\n')
+        assert len(lines) == 4
+
+        codelines = code.split('\n')
+
+        for li in range(1, 3):
+            assert lines[li].rstrip() == "    {}".format(codelines[li])
