@@ -366,6 +366,7 @@ class GopherHTMLParser(HTMLParser):
         self._extracted_link_renderer_map = RendererMap(self.extracted_link_renderers)
         self._next_link_number = 1
         self._pending_links = []
+        self._in_pre = False
 
     def _get_top(self):
         t = None
@@ -394,6 +395,8 @@ class GopherHTMLParser(HTMLParser):
     def handle_starttag(self, tag, attrs):
         parent = self._get_top() or self.tree
         t = None
+        if tag == 'pre':
+            self._in_pre = True
         if tag == 'a':
             t = LinkParser(
                 tag,
@@ -422,6 +425,8 @@ class GopherHTMLParser(HTMLParser):
 
     def handle_endtag(self, tag):
         top = self._get_top()
+        if tag == 'pre':
+            self._in_pre = False
         if not top:
             print("Unsupported or mismatched end tag, ignoring: " + tag)
             return
@@ -436,6 +441,11 @@ class GopherHTMLParser(HTMLParser):
             self._tag_stack.pop()
 
     def handle_data(self, data):
+        # Ignore any whitespace data on its own, unless in a pre tag
+        # Pretty printed html includes a lot of this.
+        if not self._in_pre:
+            if len(data) == 0 or data.isspace():
+                return
         parent = self._get_top()
         d = DataParser(parent, data)
         if parent:
