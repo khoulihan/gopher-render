@@ -37,6 +37,12 @@ class TagParser(object):
         self.renderer_settings = None
         self._context = context
 
+    def tag_children(self):
+        """
+        Return only the children that represent tags (i.e. exclude any DataParsers)
+        """
+        return [t for t in self.children if t.tag is not None]
+
     def __extract_classes(self):
         if 'class' in self.attrs:
             self.attrs['class'] = self.attrs['class'].split()
@@ -238,6 +244,12 @@ class DocumentParser(object):
     """
     def __init__(self):
         self.children = []
+
+    def tag_children(self):
+        """
+        Return only the children that represent tags (i.e. exclude any DataParsers)
+        """
+        return [t for t in self.children if t.tag is not None]
 
     def append(self, tag):
         self.children.append(tag)

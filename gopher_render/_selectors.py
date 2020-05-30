@@ -20,12 +20,16 @@ def _element_matches(tag, element):
     # Probably not.
     if not hasattr(tag, 'tag'):
         return False
+    if hasattr(tag, 'data'):
+        return False
     # element.element will be None for the universal selector ('*')
     return tag.tag == element.element or element.element is None
 
 
 def _hash_matches(tag, hash):
     if not hasattr(tag, 'id') or tag.id is None:
+        return False
+    if hasattr(tag, 'data'):
         return False
     return tag.id == hash.id and (
         hash.selector is None or
@@ -36,12 +40,16 @@ def _hash_matches(tag, hash):
 def _class_matches(tag, klass):
     if not hasattr(tag, 'classes') or tag.classes is None:
         return False
+    if hasattr(tag, 'data'):
+        return False
     return klass.class_name in tag.classes and _selector_matches(tag, klass.selector)
 
 
 # Combination match functions
 
 def _negation_matches(tag, selector):
+    if hasattr(tag, 'data'):
+        return False
     return (
         _selector_matches(tag, selector.selector) and
         not _selector_matches(tag, selector.subselector)
@@ -87,10 +95,8 @@ def _general_sibling_matches(tag, selector):
     if not primary_match:
         return False
 
-    for sibling in tag.parent.children:
-        print (sibling)
+    for sibling in tag.parent.tag_children():
         if sibling is tag:
-            print ("Reached tag")
             return False
         if _selector_matches(sibling, selector.selector):
             return True
@@ -107,12 +113,13 @@ def _adjacent_sibling_matches(tag, selector):
     if not primary_match:
         return False
 
-    tag_index = tag.parent.children.index(tag)
+    tag_children = tag.parent.tag_children()
+    tag_index = tag_children.index(tag)
     # If the tag is the first within the parent then
     # it can't have a previous sibling.
     if tag_index == 0:
         return False
-    sibling = tag.parent.children[tag_index - 1]
+    sibling = tag_children[tag_index - 1]
     return _selector_matches(sibling, selector.selector)
 
 
@@ -171,41 +178,53 @@ def _combination_matches(tag, selector):
 def _nth_child_matches(tag, selector):
     if not hasattr(tag, 'parent') or tag.parent is None:
         return False
+    if hasattr(tag, 'data'):
+        return False
     # A lot of ways this could fail!
     # TODO: Apparently this can take arguments like 'odd', 'even', '5n' (every 5th element)
     n = int(selector.arguments[0].value)
-    if n > len(tag.parent.children):
+    tag_children = tag.parent.tag_children()
+    if n > len(tag_children):
         return False
-    return tag.parent.children[n - 1] is tag and _selector_matches(tag, selector.selector)
+    return tag_children[n - 1] is tag and _selector_matches(tag, selector.selector)
 
 
 def _nth_last_child_matches(tag, selector):
     if not hasattr(tag, 'parent') or tag.parent is None:
         return False
+    if hasattr(tag, 'data'):
+        return False
     # A lot of ways this could fail!
     # TODO: Apparently this can take arguments like 'odd', 'even', '5n' (every 5th element)
     n = int(selector.arguments[0].value)
-    if n > len(tag.parent.children):
+    tag_children = tag.parent.tag_children()
+    if n > len(tag_children):
         return False
-    return tag.parent.children[-n] is tag and _selector_matches(tag, selector.selector)
+    return tag_children[-n] is tag and _selector_matches(tag, selector.selector)
 
 
 def _first_child_matches(tag, selector):
     if not hasattr(tag, 'parent') or tag.parent is None:
         return False
-    if len(tag.parent.children) == 0:
+    if hasattr(tag, 'data'):
+        return False
+    tag_children = tag.parent.tag_children()
+    if len(tag_children) == 0:
         # wat
         return False
-    return tag.parent.children[0] is tag and _selector_matches(tag, selector.selector)
+    return tag_children[0] is tag and _selector_matches(tag, selector.selector)
 
 
 def _last_child_matches(tag, selector):
     if not hasattr(tag, 'parent') or tag.parent is None:
         return False
-    if len(tag.parent.children) == 0:
+    if hasattr(tag, 'data'):
+        return False
+    tag_children = tag.parent.tag_children()
+    if len(tag_children) == 0:
         # wat
         return False
-    return tag.parent.children[-1] is tag and _selector_matches(tag, selector.selector)
+    return tag_children[-1] is tag and _selector_matches(tag, selector.selector)
 
 
 _pseudoclasses = {
