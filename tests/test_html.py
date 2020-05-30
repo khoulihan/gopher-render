@@ -324,3 +324,46 @@ class TestDefaults:
         # Just one line
         lines = output.split('\n')
         assert len(lines) == 1
+
+
+    def test_span_default(self):
+        """
+        Default span tag render should do... nothing!
+        """
+        html = "<span>ClassName</span>"
+        parser = GopherHTMLParser()
+        parser.feed(html)
+        parser.close()
+        output = parser.parsed
+
+        assert output.startswith("C")
+        assert output.endswith("e")
+
+        # Just the content.
+        assert len(output) == 9
+
+        # Just one line
+        lines = output.split('\n')
+        assert len(lines) == 1
+
+
+    def test_div_default(self):
+        """
+        Default div tag render should do nothing except pad to the width of
+        the block.
+        """
+        html = "<div>ClassName</div>"
+        parser = GopherHTMLParser()
+        parser.feed(html)
+        parser.close()
+        output = parser.parsed
+
+        assert output.startswith("C")
+        assert output.strip().endswith("e")
+
+        # Just the padded content.
+        assert len(output) == 67
+
+        # Just one line
+        lines = output.split('\n')
+        assert len(lines) == 1

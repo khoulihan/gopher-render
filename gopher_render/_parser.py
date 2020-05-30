@@ -336,7 +336,10 @@ class GopherHTMLParser(HTMLParser):
         self._gopher_host = gopher_host
         self._gopher_port = gopher_port
         self.renderers = {
+            # Default renderer. A * could also be used to match any element.
             '': Renderer,
+
+            # Block elements
             'h1': MarkdownHeaderRenderer,
             'h2': MarkdownHeaderRenderer,
             'h3': MarkdownHeaderRenderer,
@@ -356,6 +359,9 @@ class GopherHTMLParser(HTMLParser):
                 margin=[0,0,0,0]
             )),
             'pre': PreRenderer,
+            'div': BlockRenderer,
+
+            # Inline elements
             'code': CodeRenderer,
             'a': LinkRenderer,
             'em': EmRenderer,
@@ -364,6 +370,7 @@ class GopherHTMLParser(HTMLParser):
             'b': StrongRenderer,
             'u': UnderlineRenderer,
             's': StrikethroughRenderer,
+            'span': InlineRenderer,
         }
         self.renderers.update(renderers)
         self.extracted_link_renderers = {
