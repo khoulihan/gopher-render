@@ -236,3 +236,91 @@ class TestDefaults:
             assert line.startswith("> ")
             assert len(line) == 67
         assert lines[2].strip() == '>'
+
+
+    def test_em_default(self):
+        """
+        Default em tag render should just surround the content in underscores.
+        """
+        html = "<em>ClassName</em>"
+        parser = GopherHTMLParser()
+        parser.feed(html)
+        parser.close()
+        output = parser.parsed
+
+        # Surrounded by underscores
+        assert output.startswith("_")
+        assert output.endswith("_")
+
+        # Only one set of underscores, and the content.
+        assert len(output) == 11
+
+        # Just one line
+        lines = output.split('\n')
+        assert len(lines) == 1
+
+
+    def test_strong_default(self):
+        """
+        Default strong tag render should just surround the content in **s.
+        """
+        html = "<strong>ClassName</strong>"
+        parser = GopherHTMLParser()
+        parser.feed(html)
+        parser.close()
+        output = parser.parsed
+
+        # Surrounded by asterisks
+        assert output.startswith("**")
+        assert output.endswith("**")
+
+        # Double asterisks, and the content.
+        assert len(output) == 13
+
+        # Just one line
+        lines = output.split('\n')
+        assert len(lines) == 1
+
+
+    def test_u_default(self):
+        """
+        Default u tag render should just surround the content in underscores.
+        """
+        html = "<u>ClassName</u>"
+        parser = GopherHTMLParser()
+        parser.feed(html)
+        parser.close()
+        output = parser.parsed
+
+        # Surrounded by underscores
+        assert output.startswith("_")
+        assert output.endswith("_")
+
+        # Only one set of underscores, and the content.
+        assert len(output) == 11
+
+        # Just one line
+        lines = output.split('\n')
+        assert len(lines) == 1
+
+
+    def test_s_default(self):
+        """
+        Default s tag (strikethrough) render should just surround the content in ~~s.
+        """
+        html = "<s>ClassName</s>"
+        parser = GopherHTMLParser()
+        parser.feed(html)
+        parser.close()
+        output = parser.parsed
+
+        # Surrounded by tildes
+        assert output.startswith("~~")
+        assert output.endswith("~~")
+
+        # Double tildes, and the content.
+        assert len(output) == 13
+
+        # Just one line
+        lines = output.split('\n')
+        assert len(lines) == 1
