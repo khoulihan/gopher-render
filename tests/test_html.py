@@ -209,3 +209,30 @@ class TestDefaults:
 
         for li in range(1, 3):
             assert lines[li].rstrip() == "    {}".format(codelines[li - 1])
+
+
+    def test_blockquote_default(self):
+        """
+        Blockquotes have a line before and after, and '> ' at the start of each
+        line. Paragraphs within the quote will have one blank line between them,
+        but the first and last paragraphs will not have top and bottom margins
+        respectively.
+        """
+        html = "<blockquote><p>One</p><p>Two</p></blockquote>"
+        parser = GopherHTMLParser()
+        parser.feed(html)
+        parser.close()
+        output = parser.parsed
+
+        # Blank lines before and after.
+        assert output.startswith("\n")
+        assert output.endswith("\n")
+
+        # No wrapping should occur (line count includes blanks)
+        lines = output.split('\n')
+        assert len(lines) == 5
+
+        for line in lines[1:-1]:
+            assert line.startswith("> ")
+            assert len(line) == 67
+        assert lines[2].strip() == '>'

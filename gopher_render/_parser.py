@@ -345,6 +345,16 @@ class GopherHTMLParser(HTMLParser):
             'h6': MarkdownHeaderRenderer,
             'p': ParagraphRenderer,
             'blockquote': BlockQuoteRenderer,
+            'blockquote > p:first-child': (None, dict(
+                margin=[0,0,1,0]
+            )),
+            'blockquote > p:last-child': (None, dict(
+                margin=[1,0,0,0]
+            )),
+            # TODO: I think there is an :only-child selector for this
+            'blockquote > p:last-child:first-child': (None, dict(
+                margin=[0,0,0,0]
+            )),
             'pre': PreRenderer,
             'code': CodeRenderer,
             'a': LinkRenderer,

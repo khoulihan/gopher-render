@@ -97,7 +97,6 @@ class BoxSide:
     LEFT = 3
 
 
-# TODO: Need to take line format width into account here as well.
 class Box(object):
     """
     A rudimentary nesting box model where left and right margins are inherited.
@@ -126,6 +125,10 @@ class Box(object):
         self.border = border[:]
         self.total_border = border[:]
         self.line_template = line_template
+        self.line_template_padding = 0
+        self.total_line_template_padding = 0
+        if self.line_template:
+            self.line_template_padding = len(self.line_template) - 2
         self.parent = parent
         # If a parent was provided, its width overrides the provided width
         # and its margins are added to the provided margins to give total margins
@@ -138,18 +141,24 @@ class Box(object):
             self.total_padding[BoxSide.RIGHT] = self.padding[BoxSide.RIGHT] + parent.total_padding[BoxSide.RIGHT]
             self.total_border[BoxSide.LEFT] = self.border[BoxSide.LEFT] + parent.total_border[BoxSide.LEFT]
             self.total_border[BoxSide.RIGHT] = self.border[BoxSide.RIGHT] + parent.total_border[BoxSide.RIGHT]
+            self.total_line_template_padding = self.line_template_padding + parent.total_line_template_padding
 
-    def _get_line_template_padding(self):
+    def inner_width_excluding_line_template():
+        doc = """
+        The width actually available to the element's inner content,
+        excluding the extra padding created by the line_template.
+
+        Block content should be wrapped to this width.
         """
-        Determine how much extra space is required for the line_template, if one
-        was provided.
-        """
-        if self.line_template == None:
-            return 0
-        # TODO: Should replace this with using the Formatter class to parse
-        # the template, because there may be other ways that the replacement
-        # could be specified.
-        return len(self.line_template) - 2
+        def fget(self):
+            return self.width - (
+                self.total_margin[BoxSide.LEFT] + self.total_margin[BoxSide.RIGHT] +
+                self.total_padding[BoxSide.LEFT] + self.total_padding[BoxSide.RIGHT] +
+                self.total_border[BoxSide.LEFT] + self.total_border[BoxSide.RIGHT] +
+                self.total_line_template_padding
+            )
+        return locals()
+    inner_width_excluding_line_template = property(**inner_width_excluding_line_template())
 
     def inner_width():
         doc = "The width actually available to the element's inner content."
@@ -165,10 +174,12 @@ class Box(object):
     def padded_width():
         doc = "The width of the element including the padding."
         def fget(self):
+            # This has to include the width of the local line template
+            # but exclude any added by further up the hierarchy.
             return self.width - (
                 self.total_margin[BoxSide.LEFT] + self.total_margin[BoxSide.RIGHT] +
                 self.total_border[BoxSide.LEFT] + self.total_border[BoxSide.RIGHT] +
-                self._get_line_template_padding()
+                (self.total_line_template_padding - self.line_template_padding)
             )
         return locals()
     padded_width = property(**padded_width())
@@ -540,16 +551,31 @@ class ParagraphRenderer(BlockRenderer):
         line_template="{}",
     )
 
+    # TODO: Very repetitive
     def _generate_box(self):
         """
         Create a box adjusted for the context.
 
-        This class adds a left and right margin if set for the formatter, and takes
-        the line_template into account if there is one.
+        This class adds a left and right margin if set for the formatter.
         """
-        box = super()._generate_box()
-        box.line_template = self.settings.line_template
-        return box
+        context = self.context
+        parent = context.get('parent_box', None)
+        settings = self.settings
+
+        if parent:
+            # TODO: What if None?
+            margin = settings.get('margin', None)
+            padding = settings.get('padding', None)
+            line_template = settings.get('line_template', None)
+            border = self._border_width
+            return Box(
+                margin=margin,
+                padding=padding,
+                border=border,
+                parent=parent,
+                line_template=line_template,
+            )
+        return None
 
     def _skip(self, children):
         return len(children) == 1 and children[0].tag in ['code', 'pre']
@@ -583,7 +609,7 @@ class ParagraphRenderer(BlockRenderer):
             if textwrap_arg in settings:
                 justify_args[textwrap_arg] = settings[textwrap_arg]
 
-        width = self.box.inner_width
+        width = self.box.inner_width_excluding_line_template
         # TODO: Is a block or line template useful here?
         inner = capitalize_func(content)
         #template = settings['template']
@@ -798,7 +824,46 @@ class StrikethroughRenderer(InlineRenderer):
     )
 
 
-class BlockQuoteRenderer(ParagraphRenderer):
+class BlockQuoteRenderer(BlockRenderer):
     settings = dict(
-        line_template="> {}"
+        line_template="> {}",
+        margin=[1,0,1,0],
     )
+
+    # TODO: Very repetitive
+    def _generate_box(self):
+        """
+        Create a box adjusted for the context.
+
+        This class adds a left and right margin if set for the formatter.
+        """
+        context = self.context
+        parent = context.get('parent_box', None)
+        settings = self.settings
+
+        if parent:
+            # TODO: What if None?
+            margin = settings.get('margin', None)
+            padding = settings.get('padding', None)
+            line_template = settings.get('line_template', None)
+            border = self._border_width
+            return Box(
+                margin=margin,
+                padding=padding,
+                border=border,
+                parent=parent,
+                line_template=line_template,
+            )
+        return None
+
+    def _inner_render(self, content):
+        settings = self.settings
+
+        width = self.box.inner_width
+
+        content_split = content.splitlines()
+        template = self.settings.line_template
+
+        return "\n".join(
+            [template.format(line) for line in content_split]
+        )
