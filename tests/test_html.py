@@ -26,14 +26,14 @@ class TestDefaults:
 
         # No wrapping should occur (line count includes blanks)
         lines = output.split('\n')
-        assert len(lines) == 2
+        assert len(lines) == 3
 
         # Initial line indent
         #assert lines[1].startswith(' ' * 8)
 
-        assert lines[0].strip() == "Paragraph Text"
-        assert len(lines[0]) == 67
-        assert lines[1] == ''
+        assert lines[1].strip() == "Paragraph Text"
+        assert len(lines[1]) == 67
+        assert lines[2] == ''
 
 
     def test_p_tag_default_long(self):
@@ -60,13 +60,13 @@ class TestDefaults:
 
         # Wrapping (line count includes blank lines)
         lines = output.split('\n')
-        assert len(lines) == 9
+        assert len(lines) == 10
 
         # Initial line indent
         #assert lines[1].startswith(' ' * 8)
 
-        # Check that lines are fully justified.
-        for li in range(1, len(lines) - 2):
+        # Check that lines are padded to the correct width
+        for li in range(1, len(lines) - 1):
             assert len(lines[li]) == 67
 
 
@@ -77,8 +77,9 @@ class TestDefaults:
         output = parser.parsed
 
         assert output.strip() == result
+        assert output.startswith('\n')
         assert output.endswith('\n')
-        assert len(output) == 68
+        assert len(output) == 69
 
 
     def test_h1_tag_default(self):
@@ -197,13 +198,14 @@ class TestDefaults:
         output = parser.parsed
 
         # Blank lines before and after.
+        assert output.startswith("\n")
         assert output.endswith("\n")
 
         # No wrapping should occur (line count includes blanks)
         lines = output.split('\n')
-        assert len(lines) == 4
+        assert len(lines) == 5
 
         codelines = code.split('\n')
 
         for li in range(1, 3):
-            assert lines[li].rstrip() == "    {}".format(codelines[li])
+            assert lines[li].rstrip() == "    {}".format(codelines[li - 1])

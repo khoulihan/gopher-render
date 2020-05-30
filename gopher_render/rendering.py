@@ -471,7 +471,7 @@ class HeaderRenderer(BlockRenderer):
         underlined=False,
         underline_char="=",
         underline_full=False,
-        margin=[0,0,1,0]
+        margin=[1,0,1,0]
     )
 
     def _inner_render(self, content):
@@ -536,7 +536,7 @@ class ParagraphRenderer(BlockRenderer):
         fix_sentence_endings=True,
         break_long_words=True,
         skip_for_code_or_pre=True,
-        margin=[0,0,1,0],
+        margin=[1,0,1,0],
         line_template="{}",
     )
 
@@ -631,7 +631,7 @@ class PreRenderer(BlockRenderer):
     settings = dict(
         line_template="{}",
         indent=4,
-        margin=[0,0,1,0],
+        margin=[1,0,1,0],
     )
 
     def _inner_render(self, content):
