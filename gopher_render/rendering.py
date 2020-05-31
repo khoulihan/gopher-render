@@ -1,4 +1,4 @@
-import textwrap
+from . import _textwrap as textwrap
 import inspect
 
 from ._namedict import namedict
@@ -980,3 +980,160 @@ class OrderedListItemRenderer(ListItemRenderer):
 
     def _get_ordinal(self, tag, start_index, step):
         return (tag.parent.children.index(tag) * step) + start_index
+
+
+ansi_colours = {
+    "black": 30,
+    "red": 31,
+    "green": 32,
+    "yellow": 33,
+    "blue": 34,
+    "magenta": 35,
+    "cyan": 36,
+    "white": 37,
+    "bright_black": 90,
+    "bright_red": 91,
+    "bright_green": 92,
+    "bright_yellow": 93,
+    "bright_blue": 94,
+    "bright_magenta": 95,
+    "bright_cyan": 96,
+    "bright_white": 97,
+}
+ANSI_BACKGROUND_COLOUR_OFFSET = 10
+ANSI_FONT_OFFSET = 10
+
+# Codes to activate and deactive effects - except colours and fonts.
+ansi_escape_sequences = {
+    "bold": (1, 22),
+    "faint": (2, 22),
+    "italic": (3, 23),
+    "fraktur": (20, 23),
+    "underline": (4, 24),
+    "slow_blink": (5, 25),
+    "rapid_blink": (6, 25),
+    "invert": (7, 27),
+    "conceal": (8, 28),
+    "crossed_out": (9, 29),
+    "framed": (51, 54),
+    "encircled": (52, 54),
+    "overlined": (53, 55),
+}
+
+ANSI_ESCAPE_SEQUENCE = "\033[{}m"
+
+
+def _get_sequence_for_colour(colour, is_background=False):
+    # Colours can be specified in one of four ways
+    #    - ANSI 4-bit colour name
+    #    - Number of colour in the 8-bit palette
+    #    - Tuple containing (r, g, b) values
+    #    - HTML #rgb or #rrggbb values
+    if colour in ansi_colours:
+        offset = 0
+        if is_background:
+            offset = ANSI_BACKGROUND_COLOUR_OFFSET
+        return "{}".format(ansi_colours[colour] + offset)
+
+    control = "48" if is_background else "38"
+    if isinstance(colour, int):
+        return "{};5;{}".format(control, colour)
+
+    if isinstance(colour, str):
+        # Try to parse as an html colour- TODO
+        return ""
+
+    # Fall back to a tuple
+    return "{};2;{};{};{}".format(
+        control,
+        colour[0],
+        colour[1],
+        colour[2],
+    )
+
+
+class AnsiEscapeCodeRenderer(InlineRenderer):
+    """
+    Inline renderer that can style text using ANSI terminal escape sequences.
+    """
+
+    settings = dict(
+        foreground_colour=None,
+        background_colour=None,
+        font=None,
+        bold=False,
+        underline=False,
+        invert=False,
+        italic=False, # Apparently not widely supported
+        faint=False, # Apparently not widely supported
+        slow_blink=False,
+        rapid_blink=False, # Apparently not widely supported
+        conceal=False, # Apparently not widely supported
+        crossed_out=False, # Apparently not widely supported
+        fraktur=False, # Apparently hardly ever supported. Don't know what it is!
+        framed=False,
+        encircled=False,
+        overlined=False,
+        normalise=False,
+    )
+
+    def render(self, content):
+        settings = self.settings
+        inner = super().render(content)
+        normalise = settings.normalise
+        enable = []
+        disable = []
+
+        for effect in ansi_escape_sequences:
+            if settings[effect]:
+                enable.append(
+                    ANSI_ESCAPE_SEQUENCE.format(
+                        ansi_escape_sequences[effect][0]
+                    )
+                )
+                if not normalise:
+                    disable.append(
+                        ANSI_ESCAPE_SEQUENCE.format(
+                            ansi_escape_sequences[effect][1]
+                        )
+                    )
+
+        # Fonts
+        if settings.font is not None:
+            enable.append(ANSI_ESCAPE_SEQUENCE.format(setting.font + ANSI_FONT_OFFSET))
+            if not normalise:
+                disable.append(ANSI_ESCAPE_SEQUENCE.format(0 + ANSI_FONT_OFFSET))
+
+        # Colours
+        if settings.foreground_colour:
+            enable.append(
+                ANSI_ESCAPE_SEQUENCE.format(
+                    _get_sequence_for_colour(
+                        settings.foreground_colour
+                    )
+                )
+            )
+            if not normalise:
+                # Default foreground
+                disable.append(ANSI_ESCAPE_SEQUENCE.format(39))
+        if settings.background_colour:
+            enable.append(
+                ANSI_ESCAPE_SEQUENCE.format(
+                    _get_sequence_for_colour(
+                        settings.background_colour,
+                        is_background=True
+                    )
+                )
+            )
+            if not normalise:
+                # Default background
+                disable.append(ANSI_ESCAPE_SEQUENCE.format(49))
+
+        if normalise:
+            disable.append(ANSI_ESCAPE_SEQUENCE.format(0))
+
+        return "{}{}{}".format(
+            "".join(enable),
+            inner,
+            "".join(disable)
+        )
