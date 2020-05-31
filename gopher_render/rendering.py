@@ -1022,6 +1022,22 @@ ansi_escape_sequences = {
 
 ANSI_ESCAPE_SEQUENCE = "\033[{}m"
 
+def _parse_html_colour(colour):
+    """
+    Return a thruple of the red, green and blue elements of an HTML colour string
+    """
+    colour = colour.lstrip('#')
+    if len(colour) == 3:
+        colour = "{}{}{}".format(
+            colour[0] * 2,
+            colour[1] * 2,
+            colour[2] * 2,
+        )
+    return (
+        int(colour[0:2], base=16),
+        int(colour[2:4], base=16),
+        int(colour[4:6], base=16),
+    )
 
 def _get_sequence_for_colour(colour, is_background=False):
     # Colours can be specified in one of four ways
@@ -1041,7 +1057,7 @@ def _get_sequence_for_colour(colour, is_background=False):
 
     if isinstance(colour, str):
         # Try to parse as an html colour- TODO
-        return ""
+        colour = _parse_html_colour(colour)
 
     # Fall back to a tuple
     return "{};2;{};{};{}".format(
