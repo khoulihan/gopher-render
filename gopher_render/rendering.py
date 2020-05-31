@@ -97,6 +97,11 @@ class BoxSide:
     LEFT = 3
 
 
+def _get_template_width(template):
+    # TODO: This needs to be more sophisticated
+    return len(template) - 2
+
+
 class Box(object):
     """
     A rudimentary nesting box model where left and right margins are inherited.
@@ -128,7 +133,7 @@ class Box(object):
         self.line_template_padding = 0
         self.total_line_template_padding = 0
         if self.line_template:
-            self.line_template_padding = len(self.line_template) - 2
+            self.line_template_padding = _get_template_width(self.line_template)
         self.parent = parent
         # If a parent was provided, its width overrides the provided width
         # and its margins are added to the provided margins to give total margins
@@ -867,3 +872,111 @@ class BlockQuoteRenderer(BlockRenderer):
         return "\n".join(
             [template.format(line) for line in content_split]
         )
+
+
+class ListRenderer(BlockRenderer):
+    settings = dict(
+        margin=[1,0,1,0],
+        padding=[0,0,0,0]
+    )
+
+
+class ListItemRenderer(BlockRenderer):
+    settings = dict(
+        line_template="* {}",
+        margin=[1,0,0,0],
+        initial_indent=0,
+        subsequent_indent=0,
+        justification='left',
+        capitalized=False,
+        fix_sentence_endings=True,
+        break_long_words=True,
+    )
+
+    # TODO: Very repetitive
+    def _generate_box(self):
+        """
+        Create a box adjusted for the context.
+
+        This class adds a line template if set for the formatter.
+        """
+        context = self.context
+        parent = context.get('parent_box', None)
+        settings = self.settings
+
+        if parent:
+            # TODO: What if None?
+            margin = settings.get('margin', None)
+            padding = settings.get('padding', None)
+            line_template = settings.get('line_template', None)
+            border = self._border_width
+            return Box(
+                margin=margin,
+                padding=padding,
+                border=border,
+                parent=parent,
+                line_template=line_template,
+            )
+        return None
+
+    def _inner_render(self, content):
+        settings = self.settings
+
+        justify_func = justifications[settings.justification]
+        capitalize_func = capitalize if settings.capitalized else _noop
+
+        justify_args = dict(
+            initial_indent=' '*settings.initial_indent,
+            subsequent_indent=' '*settings.subsequent_indent,
+        )
+        for textwrap_arg in [
+            'fix_sentence_endings',
+            'break_long_words',
+            'break_on_hyphens',
+            'placeholder',
+            'drop_whitespace',
+            'replace_whitespace',
+            'expand_tabs',
+            'tabsize',
+        ]:
+            if textwrap_arg in settings:
+                justify_args[textwrap_arg] = settings[textwrap_arg]
+
+        width = self.box.inner_width_excluding_line_template
+        # TODO: Is a block or line template useful here?
+        inner = capitalize_func(content)
+        justified = justify_func(inner, width, **justify_args)
+        just_split = justified.split("\n")
+        template = self.settings.line_template
+        # The template only applies for the first line in this case, the rest
+        # are just padded by its width.
+        out = [template.format(just_split[0])]
+        template_width = self.box.line_template_padding
+        if len(just_split) > 1:
+            out.extend(['{}{}'.format(' ' * template_width, line) for line in just_split[1:]])
+        return "\n".join(out)
+
+
+class OrderedListItemRenderer(ListItemRenderer):
+    settings = dict(
+        line_template="{0}. {1}",
+        start_index=1,
+        step=1,
+    )
+
+    def __init__(self, tag, **kwargs):
+        # Determine the ordinal and prepare a template based on it before the
+        # box gets generated, otherwise the width will be incorrect.
+        self.order = self._get_ordinal(
+            tag,
+            self.settings.start_index,
+            self.settings.step,
+        )
+        self.settings.line_template = self.settings.line_template.format(
+            self.order,
+            '{}'
+        )
+        super().__init__(tag, **kwargs)
+
+    def _get_ordinal(self, tag, start_index, step):
+        return (tag.parent.children.index(tag) * step) + start_index

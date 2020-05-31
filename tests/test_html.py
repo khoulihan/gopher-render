@@ -367,3 +367,70 @@ class TestDefaults:
         # Just one line
         lines = output.split('\n')
         assert len(lines) == 1
+
+
+    def test_ul_default(self):
+        """
+        Default ul tag render. It prepends list items with '* ' and has a margin
+        above and below.
+        """
+        html = "<ul><li>One</li><li>Two</li><li>Three</li></ul>"
+        parser = GopherHTMLParser()
+        parser.feed(html)
+        parser.close()
+        output = parser.parsed
+
+        assert output.startswith("\n")
+        assert output.endswith("\n")
+
+        lines = output.split('\n')
+        assert len(lines) == 5
+        for i in range(1, 4):
+            assert lines[i].startswith("* ")
+            assert len(lines[i]) == 67
+
+
+    def test_ol_default(self):
+        """
+        Default ol tag render. It prepends list items with a number and has a margin
+        above and below.
+        """
+        html = "<ol><li>One</li><li>Two</li><li>Three</li></ol>"
+        parser = GopherHTMLParser()
+        parser.feed(html)
+        parser.close()
+        output = parser.parsed
+
+        assert output.startswith("\n")
+        assert output.endswith("\n")
+
+        lines = output.split('\n')
+        assert len(lines) == 5
+        for i in range(1, 4):
+            assert lines[i].startswith("{}. ".format(i))
+            assert len(lines[i]) == 67
+
+
+    def test_nested_lists_default(self):
+        """
+        Nested lists.
+        """
+        html = "<ol><li>One</li><li>Two<ul><li>Two Point One</li><li>Two Point Two</li></ul></li><li>Three</li></ol>"
+        parser = GopherHTMLParser()
+        parser.feed(html)
+        parser.close()
+        output = parser.parsed
+
+        assert output.startswith("\n")
+        assert output.endswith("\n")
+
+        lines = output.split('\n')
+        assert len(lines) == 7
+        for i in range(1, 3):
+            assert lines[i].startswith("{}. ".format(i))
+            assert len(lines[i]) == 67
+        for i in range(3, 5):
+            assert lines[i].startswith("   * ")
+            assert len(lines[i]) == 67
+        assert lines[5].startswith("3. ".format(i))
+        assert len(lines[5]) == 67

@@ -16,6 +16,7 @@ from .rendering import CodeRenderer, PreRenderer
 from .rendering import EmRenderer, StrongRenderer
 from .rendering import UnderlineRenderer, StrikethroughRenderer
 from .rendering import LinkRenderer, ExtractedLinkRenderer
+from .rendering import ListRenderer, ListItemRenderer, OrderedListItemRenderer
 
 
 # TODO: Maybe this class should do more actual parsing? Or just rename to Tag
@@ -360,6 +361,17 @@ class GopherHTMLParser(HTMLParser):
             )),
             'pre': PreRenderer,
             'div': BlockRenderer,
+            'ul': ListRenderer,
+            'ol': ListRenderer,
+            'li': ListItemRenderer,
+            'ol > li': OrderedListItemRenderer,
+            'li:first-child': (None, dict(
+                margin=[0,0,0,0]
+            )),
+            # TODO: The need for this is unfortunate...
+            'li > ol > li:first-child, li > ul > li:first-child': (None, dict(
+                margin=[1,0,0,0]
+            )),
 
             # Inline elements
             'code': CodeRenderer,
