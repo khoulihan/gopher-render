@@ -5,6 +5,7 @@ from markdown.extensions import codehilite
 import pygments
 from . import GopherHTMLParser
 from .rendering import Box
+from .code_themes.monokai import renderers as monokai
 
 def _parse_arguments():
     parser = argparse.ArgumentParser(description="Convert Markdown or HTML to plain text or gophermaps")
@@ -50,7 +51,8 @@ def main():
             width=67,
             margin=[1,0,1,0]
         ),
-        link_placement='footer'
+        link_placement='footer',
+        renderers=monokai
     )
     parser.feed(md_parsed)
     parser.close()
