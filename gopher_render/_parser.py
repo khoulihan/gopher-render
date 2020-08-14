@@ -247,7 +247,7 @@ class DataParser(TagParser):
                 data_stripped.append(data_split[-1].lstrip())
                 data_split = data_stripped
             data = ' '.join(data_split)
-            data = re.sub('[\s\t]+', ' ', data)
+            data = re.sub('[ \t]+', ' ', data)
         self.data = data
         self.closed = True
 
