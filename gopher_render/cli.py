@@ -1,4 +1,5 @@
 import argparse
+from pathlib import Path
 # TODO: Optional modules should be optional!
 import markdown
 from markdown.extensions import codehilite
@@ -20,31 +21,33 @@ def _parse_arguments():
 def main():
     args = _parse_arguments()
     source_text = None
-    with open(args.source, 'r') as in_file:
+    source_path = Path(args.source)
+    with open(source_path, 'r') as in_file:
         source_text = in_file.read()
 
-    md = markdown.Markdown(extensions=['markdown.extensions.codehilite', 'markdown.extensions.extra', 'markdown.extensions.meta'], **{
-        'extension_configs': {
-            'markdown.extensions.codehilite': {'css_class': 'highlight'},
-            'markdown.extensions.extra': {},
-            'markdown.extensions.meta': {},
-        },
-        'output_format': 'html5',
-    })
+    if source_path.suffix == '.md':
+        md = markdown.Markdown(extensions=['markdown.extensions.codehilite', 'markdown.extensions.extra', 'markdown.extensions.meta'], **{
+            'extension_configs': {
+                'markdown.extensions.codehilite': {'css_class': 'highlight'},
+                'markdown.extensions.extra': {},
+                'markdown.extensions.meta': {},
+            },
+            'output_format': 'html5',
+        })
 
-    # This version is for checking that default code blocks work ok
-    # md = markdown.Markdown(extensions=['markdown.extensions.meta'], **{
-    #     'extension_configs': {
-    #         'markdown.extensions.meta': {},
-    #     },
-    #     'output_format': 'html5',
-    # })
+        # This version is for checking that default code blocks work ok
+        # md = markdown.Markdown(extensions=['markdown.extensions.meta'], **{
+        #     'extension_configs': {
+        #         'markdown.extensions.meta': {},
+        #     },
+        #     'output_format': 'html5',
+        # })
 
-    #md = markdown.Markdown()
-    md_parsed = md.convert(source_text)
+        #md = markdown.Markdown()
+        source_text = md.convert(source_text)
 
     if args.dump:
-        print(md_parsed)
+        print(source_text)
 
     parser = GopherHTMLParser(
         output_format="text",
@@ -56,7 +59,7 @@ def main():
         link_placement='footer',
         renderers=autumn
     )
-    parser.feed(md_parsed)
+    parser.feed(source_text)
     parser.close()
 
     #with open(args.destination, 'w') as out_file:

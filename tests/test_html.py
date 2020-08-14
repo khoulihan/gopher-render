@@ -38,7 +38,7 @@ class TestDefaults:
 
     def test_p_tag_default_long(self):
         """
-        Default p tag render has a below
+        Default p tag render has a line below
         Long lines are wrapped to 67 characters and full justified.
         """
         html = ''.join([
@@ -68,6 +68,30 @@ class TestDefaults:
         # Check that lines are padded to the correct width
         for li in range(1, len(lines) - 1):
             assert len(lines[li]) == 67
+
+
+    def test_br_tag_default(self):
+        """
+        Default br tag renderer just adds a newline. It should not be removed
+        by p tag formatting.
+        """
+        html = "<p>Paragraph<br/>Text</p>"
+        parser = GopherHTMLParser()
+        parser.feed(html)
+        parser.close()
+        output = parser.parsed
+
+        # Blank line after.
+        assert output.endswith("\n")
+
+        # One extra wrap for the br
+        lines = output.split('\n')
+        assert len(lines) == 4
+
+        assert lines[1].strip() == "Paragraph"
+        assert len(lines[1]) == 67
+        assert lines[2].strip() == 'Text'
+        assert len(lines[2]) == 67
 
 
     def _header(self, html, result):
@@ -434,3 +458,53 @@ class TestDefaults:
             assert len(lines[i]) == 67
         assert lines[5].startswith("3. ".format(i))
         assert len(lines[5]) == 67
+
+
+    def test_whitespace(self):
+        """
+        Test that whitespace is removed or preserved as expected.
+        """
+        html = "\n".join([
+            "<p>  This \t\t\tparagraph  ",
+            "     has a \tbunch of",
+            "whitespace   in between    ",
+            "the lines  </p>",
+        ])
+        parser = GopherHTMLParser()
+        parser.feed(html)
+        parser.close()
+        output = parser.parsed
+
+        lines = output.split('\n')
+        assert len(lines) == 3
+
+        # This is the formatted paragraph, but it then gets padded by the box model
+        result = "This paragraph has a bunch of whitespace in between the lines"
+        result = result + (' ' * (67 - len(result)))
+        assert lines[1] == result
+
+
+    def test_whitespace_around_tags(self):
+        """
+        Test that whitespace is preserved around inline tags within a paragraph.
+        """
+        html = "\n".join([
+            "<p>A first line,",
+            "an <em>emphasised</em> second.",
+            "<strong>Strong start </strong>to a third.",
+            "</p>"
+        ])
+        parser = GopherHTMLParser()
+        parser.feed(html)
+        parser.close()
+        output = parser.parsed
+
+        lines = output.split('\n')
+        assert len(lines) == 3
+
+        # This is the formatted paragraph, but it then gets padded by the box model
+        # Note that the paragraph justification adds an extra space after the
+        # full stop here.
+        result = "A first line, an _emphasised_ second.  **Strong start **to a third."
+        result = result + (' ' * (67 - len(result)))
+        assert lines[1] == result

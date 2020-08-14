@@ -9,7 +9,7 @@ from ._namedict import namedict
 def _noop(text, *args, **kwargs):
     return text
 
-# TODO: Implement line_template in justification funcs
+
 def full_justify(text, width, *args, **kwargs):
     lines = textwrap.wrap(text, width, *args, **kwargs)
     out_lines = []
@@ -36,7 +36,8 @@ def full_justify(text, width, *args, **kwargs):
         else:
             wide = ' ' * (n + 2)
             out_lines.append(indent + wide.join(words[:r]) + wide + narrow.join(words[r:]))
-    out_lines.append(lines[-1])
+    if len(lines) > 0:
+        out_lines.append(lines[-1])
     return '\n'.join(out_lines)
 
 
@@ -618,7 +619,14 @@ class ParagraphRenderer(BlockRenderer):
         # TODO: Is a block or line template useful here?
         inner = capitalize_func(content)
         #template = settings['template']
-        justified = justify_func(inner, width, **justify_args)
+        inner_split = inner.split('\n')
+        justified = []
+        for chunk in inner_split:
+            # I think we can safely strip here because the paragraph renderer
+            # is expected to reformat its contents...
+            j = justify_func(chunk.strip(), width, **justify_args)
+            justified.append(j)
+        justified = '\n'.join(justified)
         just_split = justified.split("\n")
         template = self.settings.line_template
         return "\n".join(
@@ -827,6 +835,25 @@ class StrikethroughRenderer(InlineRenderer):
     settings = dict(
         template="~~{}~~"
     )
+
+
+class BreakRenderer(InlineRenderer):
+    """
+    Renderer for <br> tags.
+
+    Note that these must be closed (<br/>) or they will break the parser.
+    """
+
+    settings = dict(
+        template="{}",
+    )
+
+    def render(self, content):
+        settings = self.settings
+        # These tags should not have content, so it is ignored.
+        return settings.template.format(
+            super().render('\n')
+        )
 
 
 class BlockQuoteRenderer(BlockRenderer):

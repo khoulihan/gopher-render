@@ -1,3 +1,4 @@
+import re
 from html.parser import HTMLParser
 from urllib.parse import urlparse
 from collections import namedtuple
@@ -14,6 +15,7 @@ from .rendering import ParagraphRenderer, BlockQuoteRenderer
 from .rendering import CodeRenderer, PreRenderer
 from .rendering import EmRenderer, StrongRenderer
 from .rendering import UnderlineRenderer, StrikethroughRenderer
+from .rendering import BreakRenderer
 from .rendering import LinkRenderer, ExtractedLinkRenderer
 from .rendering import ListRenderer, ListItemRenderer, OrderedListItemRenderer
 from .rendering import AnsiEscapeCodeRenderer
@@ -228,6 +230,24 @@ class LinkParser(TagParser):
 class DataParser(TagParser):
     def __init__(self, parent, data, **context):
         super().__init__(None, parent, None, **context)
+        if not context['in_pre']:
+            # This attempts to remove extraneous formatting internal to the data
+            # but does not remove whitespace from the start or end of the data
+            # because it may be followed or preceeded by a tag that depends on
+            # that whitespace for separation.
+            # This produces different results than how browsers handle whitespace.
+            # TODO: Could maybe collapse such whitespace down to a single space
+            # or try to determine when data is the first or last in the tag?
+            data_split = data.split('\n')
+            if len(data_split) > 1:
+                data_stripped = []
+                data_stripped.append(data_split[0].rstrip())
+                if len(data_split) > 2:
+                    data_stripped.extend([l.strip() for l in data_split[1:-1]])
+                data_stripped.append(data_split[-1].lstrip())
+                data_split = data_stripped
+            data = ' '.join(data_split)
+            data = re.sub('[\s\t]+', ' ', data)
         self.data = data
         self.closed = True
 
@@ -348,6 +368,7 @@ class GopherHTMLParser(HTMLParser):
             'h5': MarkdownHeaderRenderer,
             'h6': MarkdownHeaderRenderer,
             'p': ParagraphRenderer,
+            'br': BreakRenderer,
             'blockquote': BlockQuoteRenderer,
             'blockquote > p:first-child': (None, dict(
                 margin=[0,0,1,0]
@@ -476,11 +497,12 @@ class GopherHTMLParser(HTMLParser):
             if len(data) == 0 or data.isspace():
                 return
         parent = self._get_top()
-        d = DataParser(parent, data)
+        d = DataParser(parent, data, in_pre=self._in_pre)
         if parent:
             parent.children.append(d)
         else:
             # No containing tags, so add directly to the root of the tree
+            # This probably indicates badly formed HTML.
             self.tree.append(d)
 
     def _indent_body(self):
