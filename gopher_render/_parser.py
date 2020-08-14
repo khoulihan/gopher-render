@@ -335,6 +335,7 @@ class GopherHTMLParser(HTMLParser):
         link_placement='footer',
         gopher_host="",
         gopher_port=70,
+        optimise=True,
     ):
         if output_format == 'gophermap' and link_placement == 'inline':
             raise ValueError("Links cannot be inlined in gophermap output")
@@ -428,6 +429,7 @@ class GopherHTMLParser(HTMLParser):
         self._next_link_number = 1
         self._pending_links = []
         self._in_pre = False
+        self._optimise = optimise
 
     def _get_top(self):
         t = None
@@ -544,6 +546,15 @@ class GopherHTMLParser(HTMLParser):
 
             self._assign_renderers(tag.children)
 
+    def _optimise_parsed(self):
+        """
+        Remove extraeous whitespace to the right of the text.
+        """
+        parsed = self.parsed
+        split = parsed.split('\n')
+        optimised = [l.rstrip() for l in split]
+        return '\n'.join(optimised)
+
     def close(self):
         super().close()
         # Compile the parsed string
@@ -578,6 +589,8 @@ class GopherHTMLParser(HTMLParser):
             indented,
             "\n" * self._box.margin[BoxSide.BOTTOM]
         )
+        if self._optimise:
+            self.parsed = self._optimise_parsed()
 
     def reset(self):
         super().reset()

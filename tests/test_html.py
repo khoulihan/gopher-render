@@ -32,7 +32,7 @@ class TestDefaults:
         #assert lines[1].startswith(' ' * 8)
 
         assert lines[1].strip() == "Paragraph Text"
-        assert len(lines[1]) == 67
+        assert len(lines[1]) == len(lines[1].strip())
         assert lines[2] == ''
 
 
@@ -50,7 +50,7 @@ class TestDefaults:
             "Paragraph Text Paragraph Text Paragraph Text Paragraph Text Paragraph ",
             "Text Paragraph Text Paragraph Text Paragraph Text</p>"
         ])
-        parser = GopherHTMLParser()
+        parser = GopherHTMLParser(optimise=False)
         parser.feed(html)
         parser.close()
         output = parser.parsed
@@ -89,9 +89,9 @@ class TestDefaults:
         assert len(lines) == 4
 
         assert lines[1].strip() == "Paragraph"
-        assert len(lines[1]) == 67
+        assert len(lines[1]) == len(lines[1].strip())
         assert lines[2].strip() == 'Text'
-        assert len(lines[2]) == 67
+        assert len(lines[2]) == len(lines[2].strip())
 
 
     def test_closed_br_tag_default(self):
@@ -113,13 +113,13 @@ class TestDefaults:
         assert len(lines) == 4
 
         assert lines[1].strip() == "Paragraph"
-        assert len(lines[1]) == 67
+        assert len(lines[1]) == len(lines[1].strip())
         assert lines[2].strip() == 'Text'
-        assert len(lines[2]) == 67
+        assert len(lines[2]) == len(lines[2].strip())
 
 
     def _header(self, html, result):
-        parser = GopherHTMLParser()
+        parser = GopherHTMLParser(optimise=False)
         parser.feed(html)
         parser.close()
         output = parser.parsed
@@ -267,7 +267,7 @@ class TestDefaults:
         respectively.
         """
         html = "<blockquote><p>One</p><p>Two</p></blockquote>"
-        parser = GopherHTMLParser()
+        parser = GopherHTMLParser(optimise=False)
         parser.feed(html)
         parser.close()
         output = parser.parsed
@@ -445,7 +445,7 @@ class TestDefaults:
         the block.
         """
         html = "<div>ClassName</div>"
-        parser = GopherHTMLParser()
+        parser = GopherHTMLParser(optimise=False)
         parser.feed(html)
         parser.close()
         output = parser.parsed
@@ -467,7 +467,7 @@ class TestDefaults:
         above and below.
         """
         html = "<ul><li>One</li><li>Two</li><li>Three</li></ul>"
-        parser = GopherHTMLParser()
+        parser = GopherHTMLParser(optimise=False)
         parser.feed(html)
         parser.close()
         output = parser.parsed
@@ -488,7 +488,7 @@ class TestDefaults:
         above and below.
         """
         html = "<ol><li>One</li><li>Two</li><li>Three</li></ol>"
-        parser = GopherHTMLParser()
+        parser = GopherHTMLParser(optimise=False)
         parser.feed(html)
         parser.close()
         output = parser.parsed
@@ -508,7 +508,7 @@ class TestDefaults:
         Nested lists.
         """
         html = "<ol><li>One</li><li>Two<ul><li>Two Point One</li><li>Two Point Two</li></ul></li><li>Three</li></ol>"
-        parser = GopherHTMLParser()
+        parser = GopherHTMLParser(optimise=False)
         parser.feed(html)
         parser.close()
         output = parser.parsed
@@ -546,9 +546,7 @@ class TestDefaults:
         lines = output.split('\n')
         assert len(lines) == 3
 
-        # This is the formatted paragraph, but it then gets padded by the box model
         result = "This paragraph has a bunch of whitespace in between the lines"
-        result = result + (' ' * (67 - len(result)))
         assert lines[1] == result
 
 
@@ -584,7 +582,7 @@ class TestDefaults:
         above and below, and a margin between terms.
         """
         html = "<dl><dt>One</dt><dd>Definition One</dd><dt>Two</dt><dd>Definition Two One</dd><dd>Definition Two Two</dd></dl>"
-        parser = GopherHTMLParser()
+        parser = GopherHTMLParser(optimise=False)
         parser.feed(html)
         parser.close()
         output = parser.parsed
