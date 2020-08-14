@@ -28,7 +28,7 @@ class TagParser(object):
         self.tag = tag
         self.parent = parent
         self.children = []
-        self.closed = False
+        self.closed = tag == 'br'
         self.attrs = {}
         self.classes = []
         self.id = None
@@ -467,13 +467,18 @@ class GopherHTMLParser(HTMLParser):
                 parent,
                 attrs,
             )
-        self._tag_stack.append(t)
+        if not t.closed:
+            self._tag_stack.append(t)
         if parent:
             parent.children.append(t)
         else:
             self.tree.append(t)
 
     def handle_endtag(self, tag):
+        if tag == 'br':
+            # br tags are inherently self-closing, so if we encounter an end tag
+            # we can just ignore it. I believe <br/> produces endtag calls.
+            return
         top = self._get_top()
         if tag == 'pre':
             self._in_pre = False

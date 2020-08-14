@@ -75,6 +75,30 @@ class TestDefaults:
         Default br tag renderer just adds a newline. It should not be removed
         by p tag formatting.
         """
+        html = "<p>Paragraph<br>Text</p>"
+        parser = GopherHTMLParser()
+        parser.feed(html)
+        parser.close()
+        output = parser.parsed
+
+        # Blank line after.
+        assert output.endswith("\n")
+
+        # One extra wrap for the br
+        lines = output.split('\n')
+        assert len(lines) == 4
+
+        assert lines[1].strip() == "Paragraph"
+        assert len(lines[1]) == 67
+        assert lines[2].strip() == 'Text'
+        assert len(lines[2]) == 67
+
+
+    def test_closed_br_tag_default(self):
+        """
+        Default br tag renderer just adds a newline. It should not be removed
+        by p tag formatting.
+        """
         html = "<p>Paragraph<br/>Text</p>"
         parser = GopherHTMLParser()
         parser.feed(html)
