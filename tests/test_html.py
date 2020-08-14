@@ -576,3 +576,27 @@ class TestDefaults:
         result = "A first line, an _emphasised_ second.  **Strong start **to a third."
         result = result + (' ' * (67 - len(result)))
         assert lines[1] == result
+
+
+    def test_dl_default(self):
+        """
+        Default dl tag render. It prepends definitions with ': ' and has a margin
+        above and below, and a margin between terms.
+        """
+        html = "<dl><dt>One</dt><dd>Definition One</dd><dt>Two</dt><dd>Definition Two One</dd><dd>Definition Two Two</dd></dl>"
+        parser = GopherHTMLParser()
+        parser.feed(html)
+        parser.close()
+        output = parser.parsed
+
+        assert output.startswith("\n")
+        assert output.endswith("\n")
+
+        lines = output.split('\n')
+        assert len(lines) == 8
+        assert lines[2].startswith(": ")
+        for i in range(5, 7):
+            assert lines[i].startswith(": ")
+            assert len(lines[i]) == 67
+        for i in range(1, 7):
+            assert len(lines[i]) == 67

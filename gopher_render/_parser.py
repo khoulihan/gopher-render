@@ -18,6 +18,7 @@ from .rendering import UnderlineRenderer, StrikethroughRenderer
 from .rendering import BreakRenderer
 from .rendering import LinkRenderer, ExtractedLinkRenderer
 from .rendering import ListRenderer, ListItemRenderer, OrderedListItemRenderer
+from .rendering import DefinitionListRenderer, DefinitionListTermHeaderRenderer, DefinitionListItemRenderer
 from .rendering import AnsiEscapeCodeRenderer
 
 
@@ -392,6 +393,14 @@ class GopherHTMLParser(HTMLParser):
             # TODO: The need for this is unfortunate...
             'li > ol > li:first-child, li > ul > li:first-child': (None, dict(
                 margin=[1,0,0,0]
+            )),
+
+            # Definition list
+            'dl': DefinitionListRenderer,
+            'dt': DefinitionListTermHeaderRenderer,
+            'dd': DefinitionListItemRenderer,
+            'dt:first-child': (None, dict(
+                margin=[0,0,0,0]
             )),
 
             # Inline elements
