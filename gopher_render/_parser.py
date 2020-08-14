@@ -236,8 +236,8 @@ class DataParser(TagParser):
             # because it may be followed or preceeded by a tag that depends on
             # that whitespace for separation.
             # This produces different results than how browsers handle whitespace.
-            # TODO: Could maybe collapse such whitespace down to a single space
-            # or try to determine when data is the first or last in the tag?
+            # However, the paragraph renderer will also strip whitespace from the
+            # start and end of its content, minimising the impact of this.
             data_split = data.split('\n')
             if len(data_split) > 1:
                 data_stripped = []
