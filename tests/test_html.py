@@ -374,6 +374,50 @@ class TestDefaults:
         assert len(lines) == 1
 
 
+    def test_ins_default(self):
+        """
+        Default ins tag render should just surround the content in underscores.
+        """
+        html = "<ins>ClassName</ins>"
+        parser = GopherHTMLParser()
+        parser.feed(html)
+        parser.close()
+        output = parser.parsed
+
+        # Surrounded by underscores
+        assert output.startswith("_")
+        assert output.endswith("_")
+
+        # Only one set of underscores, and the content.
+        assert len(output) == 11
+
+        # Just one line
+        lines = output.split('\n')
+        assert len(lines) == 1
+
+
+    def test_del_default(self):
+        """
+        Default del tag render should just surround the content in ~~s.
+        """
+        html = "<del>ClassName</del>"
+        parser = GopherHTMLParser()
+        parser.feed(html)
+        parser.close()
+        output = parser.parsed
+
+        # Surrounded by tildes
+        assert output.startswith("~~")
+        assert output.endswith("~~")
+
+        # Double tildes, and the content.
+        assert len(output) == 13
+
+        # Just one line
+        lines = output.split('\n')
+        assert len(lines) == 1
+
+
     def test_span_default(self):
         """
         Default span tag render should do... nothing!

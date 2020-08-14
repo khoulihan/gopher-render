@@ -57,7 +57,7 @@ def main():
             margin=[1,0,1,0]
         ),
         link_placement='footer',
-        renderers=autumn
+        renderers=ansi
     )
     parser.feed(source_text)
     parser.close()

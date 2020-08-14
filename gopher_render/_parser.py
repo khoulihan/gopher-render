@@ -402,7 +402,9 @@ class GopherHTMLParser(HTMLParser):
             'i': EmRenderer,
             'b': StrongRenderer,
             'u': UnderlineRenderer,
+            'ins': UnderlineRenderer,
             's': StrikethroughRenderer,
+            'del': StrikethroughRenderer,
             'span': InlineRenderer,
         }
         self.renderers.update(renderers)
