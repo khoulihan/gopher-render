@@ -17,6 +17,7 @@ from .rendering import EmRenderer, StrongRenderer
 from .rendering import UnderlineRenderer, StrikethroughRenderer
 from .rendering import BreakRenderer
 from .rendering import LinkRenderer, ExtractedLinkRenderer
+from .rendering import ImageRenderer, ExtractedImageLinkRenderer
 from .rendering import ListRenderer, ListItemRenderer, OrderedListItemRenderer
 from .rendering import DefinitionListRenderer, DefinitionListTermHeaderRenderer, DefinitionListItemRenderer
 from .rendering import AnsiEscapeCodeRenderer
@@ -29,7 +30,7 @@ class TagParser(object):
         self.tag = tag
         self.parent = parent
         self.children = []
-        self.closed = tag == 'br'
+        self.closed = tag in ('br', 'img')
         self.attrs = {}
         self.classes = []
         self.id = None
@@ -40,6 +41,7 @@ class TagParser(object):
         self.renderer = None
         self.renderer_settings = None
         self._context = context
+        self._pending_links = []
 
     def tag_children(self):
         """
@@ -52,6 +54,9 @@ class TagParser(object):
             self.attrs['class'] = self.attrs['class'].split()
             return self.attrs['class']
         return []
+
+    def add_pending_link(self, link):
+        self._pending_links.append(link)
 
     def assign_renderer(self, renderer):
         try:
@@ -83,6 +88,13 @@ class TagParser(object):
                 c.render(box)
             )
 
+        if len(self._pending_links):
+            rendered_children.append('\n')
+        for l in self._pending_links:
+            rendered_children.append(
+                l.link_render(box)
+            )
+
         return render_inst.render(
             "".join(rendered_children)
         )
@@ -104,10 +116,16 @@ class LinkParser(TagParser):
             **context
         )
         self.link_renderer = None
-        # If set, this will be used as the link description
-        self.title = self.attrs.get('title', None)
-        self.href = self.attrs.get('href', None)
-        self.gopher_link = self._parse_href()
+        if tag == 'a':
+            # If set, this will be used as the link description
+            self.title = self.attrs.get('title', None)
+            self.href = self.attrs.get('href', None)
+            self.gopher_link = self._parse_href()
+        elif tag == 'img':
+            # If set, this will be used as the link description
+            self.title = self.attrs.get('alt', None)
+            self.href = self.attrs.get('src', None)
+            self.gopher_link = self._parse_href()
 
     # TODO: This needs a lot more work to be comprehensive
     def _guess_type(self, path):
@@ -183,7 +201,8 @@ class LinkParser(TagParser):
     # original location, unless 'link_placement' is 'inline', in which case
     # link rendering occurs in the original location.
     def render(self, box):
-        if self._context['link_placement'] != 'inline':
+        placement = self._context['image_placement'] if self.tag == 'img' else self._context['link_placement']
+        if placement != 'inline':
             return super().render(box)
         return self.link_render(box)
 
@@ -199,7 +218,8 @@ class LinkParser(TagParser):
         )
         render_context.update(self._context)
 
-        if render_context["link_placement"] == "inline":
+        placement = render_context['image_placement'] if self.tag == 'img' else render_context['link_placement']
+        if placement == "inline":
             renderer = self.renderer
             renderer_settings = self.renderer_settings
         else:
@@ -333,6 +353,7 @@ class GopherHTMLParser(HTMLParser):
         extracted_link_renderers={},
         output_format='text',
         link_placement='footer',
+        image_placement='inline',
         gopher_host="",
         gopher_port=70,
         optimise=True,
@@ -356,6 +377,7 @@ class GopherHTMLParser(HTMLParser):
             )
         self._output_format = output_format
         self._link_placement = link_placement
+        self._image_placement = image_placement
         self._gopher_host = gopher_host
         self._gopher_port = gopher_port
         self.renderers = {
@@ -407,6 +429,7 @@ class GopherHTMLParser(HTMLParser):
             # Inline elements
             'code': CodeRenderer,
             'a': LinkRenderer,
+            'img': ImageRenderer,
             'em': EmRenderer,
             'strong': StrongRenderer,
             'i': EmRenderer,
@@ -420,6 +443,7 @@ class GopherHTMLParser(HTMLParser):
         self.renderers.update(renderers)
         self.extracted_link_renderers = {
             'a': ExtractedLinkRenderer,
+            'img': ExtractedImageLinkRenderer,
         }
         self.extracted_link_renderers.update(extracted_link_renderers)
         self._default_renderer = self.renderers['']
@@ -427,7 +451,7 @@ class GopherHTMLParser(HTMLParser):
         self._renderer_map = RendererMap(self.renderers)
         self._extracted_link_renderer_map = RendererMap(self.extracted_link_renderers)
         self._next_link_number = 1
-        self._pending_links = []
+        self._footer_pending_links = []
         self._in_pre = False
         self._optimise = optimise
 
@@ -460,20 +484,25 @@ class GopherHTMLParser(HTMLParser):
         t = None
         if tag == 'pre':
             self._in_pre = True
-        if tag == 'a':
+        if tag in ('a', 'img'):
             t = LinkParser(
                 tag,
                 parent,
                 attrs,
                 output_format=self._output_format,
                 link_placement=self._link_placement,
+                image_placement=self._image_placement,
                 link_reference=self._next_link_number,
                 gopher_host=self._gopher_host,
                 gopher_port=self._gopher_port,
             )
-            self._next_link_number += 1
-            if self._link_placement != 'inline':
-                self._pending_links.append(t)
+            placement = self._image_placement if tag == 'img' else self._link_placement
+            if placement == 'footer':
+                self._footer_pending_links.append(t)
+            elif placement == 'after_block':
+                parent.add_pending_link(t)
+            if placement != 'inline':
+                self._next_link_number += 1
         else:
             t = TagParser(
                 tag,
@@ -488,8 +517,8 @@ class GopherHTMLParser(HTMLParser):
             self.tree.append(t)
 
     def handle_endtag(self, tag):
-        if tag == 'br':
-            # br tags are inherently self-closing, so if we encounter an end tag
+        if tag in ('br', 'img'):
+            # br and img tags are inherently self-closing, so if we encounter an end tag
             # we can just ignore it. I believe <br/> produces endtag calls.
             return
         top = self._get_top()
@@ -511,9 +540,12 @@ class GopherHTMLParser(HTMLParser):
     def handle_data(self, data):
         # Ignore any whitespace data on its own, unless in a pre tag
         # Pretty printed html includes a lot of this.
-        if not self._in_pre:
-            if len(data) == 0 or data.isspace():
-                return
+        # Removing ths because it removes significant whitespace between
+        # adjacent tags... But I'm not convinced that pretty printing whitespace
+        # won't be an issue.
+        # if not self._in_pre:
+        #     if len(data) == 0 or data.isspace():
+        #         return
         parent = self._get_top()
         d = DataParser(parent, data, in_pre=self._in_pre)
         if parent:
@@ -535,7 +567,7 @@ class GopherHTMLParser(HTMLParser):
     def _assign_renderers(self, tags):
         for tag in tags:
             renderer = self._get_renderer(tag)
-            if tag.tag == 'a':
+            if tag.tag in ('a', 'img'):
                 tag.assign_renderer((
                         renderer,
                         self._get_extracted_link_renderer(tag)
@@ -571,9 +603,9 @@ class GopherHTMLParser(HTMLParser):
         for t in self.tree.children:
             self._parsed.append(t.render(self._box))
 
-        if self._link_placement == 'footer' and len(self._pending_links) > 0:
+        if self._link_placement == 'footer' and len(self._footer_pending_links) > 0:
             self._parsed.append("\n")
-            for l in self._pending_links:
+            for l in self._footer_pending_links:
                 self._parsed.append(l.link_render(self._box))
 
         # TODO: Some variation here within our box model:
@@ -599,4 +631,4 @@ class GopherHTMLParser(HTMLParser):
         self._tag_stack = []
         self.tree = DocumentParser()
         self._next_link_number = 1
-        self._pending_links = []
+        self._footer_pending_links = []

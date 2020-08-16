@@ -796,6 +796,92 @@ class ExtractedLinkRenderer(BlockRenderer):
         return super().render(content)
 
 
+class ImageRenderer(InlineRenderer):
+
+    settings = dict(
+        templates={
+            "reference": "[{title}][{link_reference}]",
+            "inline": "![{title}]({href})"
+        },
+        capitalized=False,
+    )
+
+    def render(self, content):
+        settings = self.settings
+        capitalize_func = capitalize if settings.capitalized else _noop
+        if self.context["image_placement"] == "inline":
+            if "title" in self.context and self.context["title"]:
+                return settings.templates["inline"].format(
+                    href=self.context["href"],
+                    title=self.context["title"],
+                )
+            else:
+                return settings.templates["inline"].format(
+                    href=self.context["href"],
+                    title="Image",
+                )
+        else:
+            if "title" in self.context and self.context["title"]:
+                title = self.context["title"]
+            else:
+                title = "Image"
+            return settings.templates["reference"].format(
+                title=title,
+                link_reference=self.context["link_reference"]
+            )
+
+
+class ExtractedImageLinkRenderer(BlockRenderer):
+
+    settings = dict(
+        templates=["\n[{link_reference}] {description}: {href}", '\n[{link_reference}] {description}: {href} "{title}"'],
+        gophermap_template="{type}[{link_reference}] {description}\t{selector}\t{host}\t{port}\n",
+        max_link_description=10,
+    )
+
+    def _inner_render(self, content):
+        settings = self.settings
+        output_format = self.context['output_format']
+        href = self.context['href']
+        if 'title' in self.context and self.context['title']:
+            title = self.context['title']
+        else:
+            title = "Image"
+
+        # TODO: Surely this truncation should be optional?
+        max_link_description = settings.max_link_description
+        trimming = len(title) > max_link_description
+        trimmed_title = title.strip()[:max_link_description]
+        if trimming:
+            trimmed_title = "{}...".format(trimmed_title)
+
+        if output_format == 'gophermap':
+            description = trimmed_title
+            gopher_link = self.context['gopher_link']
+            link_ref = self.context["link_reference"]
+            return settings.gophermap_template.format(
+                description=super()._inner_render(description),
+                link_reference=link_ref,
+                selector=gopher_link['selector'],
+                type=gopher_link['type'],
+                host=gopher_link['host'],
+                port=gopher_link['port'],
+            )
+        else:
+            template = settings.templates[0]
+            keywords = dict(
+                description=super()._inner_render(trimmed_title),
+                link_reference=self.context["link_reference"],
+                href=href,
+            )
+            if trimming:
+                template = settings.templates[1]
+                keywords["title"] = title
+            return template.format(
+                **keywords
+            )
+
+
 # TODO: i tags should also have a renderer for icons
 class EmRenderer(InlineRenderer):
     """

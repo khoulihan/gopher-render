@@ -57,6 +57,7 @@ def main():
             margin=[1,0,1,0]
         ),
         link_placement='footer',
+        image_placement='inline',
         renderers=ansi
     )
     parser.feed(source_text)
